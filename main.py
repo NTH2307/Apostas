@@ -5,7 +5,10 @@ from datetime import date
 import config
 from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.live import correr_loop, resumo_diario
+from app.model import avaliar_evento, encontrar_nome_equivalente
 from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos
+from app.poisson import golos_esperados, probabilidades
+from app.stats import buscar_jogos_terminados, calcular_forcas
 
 
 def _resolver_desportos(args) -> list:
@@ -87,6 +90,71 @@ def cmd_desportos(args):
         print(f"{d['key']:40s} {d.get('title', '')}{estado}")
 
 
+def cmd_modelo(args):
+    try:
+        jogos = buscar_jogos_terminados(args.competicao, limite=args.jogos_historico)
+    except Exception as e:
+        print(f"Erro a obter estatísticas para '{args.competicao}': {e}")
+        return
+    forcas = calcular_forcas(jogos)
+    if not forcas["equipas"]:
+        print(f"Sem jogos terminados suficientes para '{args.competicao}' — não dá para calcular o modelo.")
+        return
+    print(f"Modelo calculado a partir de {len(jogos)} jogos terminados de '{args.competicao}'.")
+
+    eventos = buscar_odds(args.desporto)
+    dia = date.fromisoformat(args.dia) if getattr(args, "dia", None) else (amanha() if getattr(args, "amanha", False) else None)
+    if dia:
+        eventos = filtrar_por_dia(eventos, dia)
+    bookmakers = args.bookmakers.split(",") if getattr(args, "bookmakers", None) else config.BOOKMAKERS_FIAVEIS
+    eventos = [filtrar_bookmakers(e, bookmakers) for e in eventos]
+
+    sem_dados = 0
+    discrepancias = 0
+    for evento in eventos:
+        casa_nome, fora_nome = evento["equipas"]
+        casa_equiv = encontrar_nome_equivalente(casa_nome, forcas["equipas"])
+        fora_equiv = encontrar_nome_equivalente(fora_nome, forcas["equipas"])
+        if not casa_equiv or not fora_equiv:
+            print(f"\n{casa_nome} vs {fora_nome}: sem dados suficientes no modelo "
+                  f"(equipa não encontrada nas estatísticas de '{args.competicao}').")
+            sem_dados += 1
+            continue
+
+        lambda_casa, lambda_fora = golos_esperados(forcas, casa_equiv, fora_equiv)
+        probs = probabilidades(lambda_casa, lambda_fora)
+        nomes_por_lado = {"casa": casa_nome, "empate": "empate", "fora": fora_nome}
+        lado_favorito = max(("casa", "empate", "fora"), key=lambda lado: probs[lado])
+
+        print(
+            f"\n{casa_nome} vs {fora_nome} — modelo: {lambda_casa:.2f}-{lambda_fora:.2f} golos esperados\n"
+            f"  1X2 modelo: casa {probs['casa'] * 100:.0f}% empate {probs['empate'] * 100:.0f}% "
+            f"fora {probs['fora'] * 100:.0f}% (favorito do modelo: {nomes_por_lado[lado_favorito]})\n"
+            f"  Golos: over 2.5 {probs['over_2.5'] * 100:.0f}% / under 2.5 {probs['under_2.5'] * 100:.0f}% "
+            f"| Ambas marcam: sim {probs['btts_sim'] * 100:.0f}% / não {probs['btts_nao'] * 100:.0f}%"
+        )
+
+        oportunidades = avaliar_evento(evento, forcas, margem_minima=args.margem_minima)
+        discrepancias += len(oportunidades)
+        for o in oportunidades:
+            print(
+                f"  💡 mercado paga mais do que o modelo acha justo: {o.resultado} @ {o.odd} ({o.bookmaker}) "
+                f"— modelo dá {o.probabilidade_modelo * 100:.0f}% (valor {o.valor * 100:.1f}%)"
+            )
+
+    print(
+        f"\n{discrepancias} discrepância(s) modelo-vs-mercado (1X2) em "
+        f"{len(eventos) - sem_dados} jogo(s) analisados ({sem_dados} sem dados suficientes no modelo)."
+    )
+    print(
+        "\n⚠️ Isto é uma segunda opinião estatística (modelo de Poisson a partir de golos "
+        "marcados/sofridos da época), não uma previsão garantida. 'Golos'/'ambas marcam' são "
+        "só a opinião do modelo — ainda não comparados com odds reais desses mercados. O "
+        "modelo pode estar errado tanto quanto o mercado, ou mais — usa para pesquisares mais, "
+        "nunca como certeza."
+    )
+
+
 def cmd_resumo(_args):
     resumo_diario()
 
@@ -137,6 +205,22 @@ def main():
     p_desportos = subparsers.add_parser("desportos", help="lista as chaves de desporto/competição disponíveis na The Odds API")
     p_desportos.add_argument("--filtro", help="texto a procurar na chave/título/descrição, ex: 'nations' ou 'portugal'")
     p_desportos.set_defaults(func=cmd_desportos)
+
+    p_modelo = subparsers.add_parser(
+        "modelo",
+        help="calcula um modelo estatístico próprio (golos marcados/sofridos, football-data.org) e compara com as odds de mercado",
+    )
+    p_modelo.add_argument("--competicao", required=True, help="código da competição na football-data.org, ex: PL, PD, SA, BL1, FL1, PPL, CL")
+    p_modelo.add_argument("--desporto", required=True, help="chave da MESMA competição na The Odds API, ex: soccer_epl")
+    p_modelo.add_argument(
+        "--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO,
+        help="quantos jogos terminados usar para calcular as forças (omissão: MODELO_JOGOS_HISTORICO no .env, 200)",
+    )
+    p_modelo.add_argument("--margem-minima", type=float, default=config.MODELO_MARGEM_MINIMA)
+    p_modelo.add_argument("--bookmakers", help="lista de bookmakers a considerar, separados por vírgula (omissão: BOOKMAKERS_FIAVEIS no .env)")
+    p_modelo.add_argument("--amanha", action="store_true", help="só jogos que começam amanhã, hora de Portugal")
+    p_modelo.add_argument("--dia", help="só jogos neste dia, formato AAAA-MM-DD, hora de Portugal")
+    p_modelo.set_defaults(func=cmd_modelo)
 
     p_resumo = subparsers.add_parser(
         "resumo",

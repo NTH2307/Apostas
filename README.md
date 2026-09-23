@@ -57,9 +57,16 @@ automaticamente.
    probabilidade "justa" de cada resultado removendo o overround médio do
    mercado (consenso entre casas), e assinala odds que pagam acima dessa
    probabilidade justa.
-4. **Dimensionamento de apostas** (`app/staking.py`): Kelly fracionado para
+4. **Modelo estatístico próprio** (`app/stats.py` + `app/poisson.py` +
+   `app/model.py`, comando `modelo`): calcula a força de ataque/defesa de
+   cada equipa a partir de golos marcados/sofridos reais (via
+   [football-data.org](https://www.football-data.org)), estima
+   probabilidades com um modelo de Poisson, e compara com as odds de
+   mercado — uma segunda opinião independente do consenso das casas, em
+   vez de só comparar casas entre si. Ver secção própria abaixo.
+5. **Dimensionamento de apostas** (`app/staking.py`): Kelly fracionado para
    apostas de valor (reduz a variância face ao Kelly completo).
-5. **Execução** (`app/executor.py` + `app/betfair_client.py`): em modo
+6. **Execução** (`app/executor.py` + `app/betfair_client.py`): em modo
    paper, só regista. Em modo real, só executa de facto apostas na Betfair
    Exchange — as restantes ficam sempre em registo manual.
 
@@ -141,6 +148,48 @@ python main.py valor --desporto soccer_epl --odd-maxima 4.0 --bookmakers "Betfai
 - `--odd-maxima` (ou `ODD_MAXIMA_VALOR` no `.env`, omissão 4.0, `0` desativa): ignora odds acima deste valor na deteção de **valor** (a arbitragem não é afetada — a garantia matemática dela não depende da magnitude da odd).
 - `--bookmakers` (ou `BOOKMAKERS_FIAVEIS` no `.env`, separados por vírgula, vazio = todas): restringe o cálculo — tanto o consenso de probabilidade "justa" como as odds candidatas — só a estas casas. Usa nomes exatamente como a The Odds API os devolve (aparecem no output do bot); serve para excluir casas não licenciadas na tua jurisdição ou de fiabilidade duvidosa.
 
+## Modelo estatístico próprio (golos, "quem ganha")
+
+O `valor`/`arbitragem` só comparam casas de apostas entre si — nunca
+"olham" para as equipas. O comando `modelo` faz isso: calcula a força de
+ataque/defesa de cada equipa a partir de golos marcados/sofridos reais na
+competição, estima golos esperados para o jogo com um **modelo de Poisson**
+(a abordagem estatística clássica para golos em futebol), e compara essa
+estimativa com as odds de mercado.
+
+```bash
+python main.py modelo --competicao PL --desporto soccer_epl --amanha
+```
+
+- `--competicao`: código da competição na **football-data.org** (ex: `PL`
+  Premier League, `PD` La Liga, `SA` Serie A, `BL1` Bundesliga, `FL1`
+  Ligue 1, `PPL` Primeira Liga, `CL` Champions League — [lista
+  completa](https://www.football-data.org/documentation/api) na
+  documentação deles).
+- `--desporto`: a chave da **mesma** competição na The Odds API (ex:
+  `soccer_epl`) — usa `python main.py desportos --filtro <termo>` para
+  encontrares a correspondente.
+- Precisa de `FOOTBALL_DATA_API_KEY` no `.env` — cria uma chave grátis em
+  [football-data.org/client/register](https://www.football-data.org/client/register).
+
+Para cada jogo mostra sempre: os golos esperados do modelo, a probabilidade
+1X2 do modelo (e o favorito segundo o modelo), e a opinião do modelo sobre
+over/under 2.5 golos e ambas marcam (BTTS). Quando o mercado paga mais do
+que o modelo acha justo no 1X2, assinala isso como discrepância.
+
+⚠️ Pontos importantes a levar a sério:
+- **Golos/BTTS são só a opinião do modelo** — ainda não há comparação com
+  odds reais desses mercados (só o 1X2/vencedor está integrado com odds).
+- O modelo é uma **média da época** (não pesa jogos recentes mais do que
+  antigos) e não sabe nada sobre lesões, suspensões, motivação ou
+  contexto do jogo — só golos marcados/sofridos.
+- **Isto não bate o mercado de forma fiável.** As casas de apostas sérias
+  (Pinnacle, Betfair) já usam modelos deste tipo — e bem mais sofisticados
+  — para fixar as odds em primeiro lugar. Uma discrepância pode ser o
+  modelo a acertar onde o mercado erra, ou o modelo simplesmente a estar
+  errado (falta-lhe informação que o mercado tem). Usa como ponto de
+  partida para pesquisares mais, nunca como certeza.
+
 ## Resumo diário (recomendado para uso do dia a dia)
 
 Em vez de correres `valor`/`arbitragem` à mão sempre que te lembras,
@@ -218,33 +267,45 @@ python -m pytest tests/ -v
 
 Cobrem a matemática de arbitragem e de valor (deteção, filtragem por
 margem mínima, cálculo de stakes), o Kelly fracionado, o carregamento de
-odds (formato normalizado e formato bruto da The Odds API), e as regras de
-quando o executor pode ou não executar uma ordem real. Correm
-automaticamente em CI (`.github/workflows/bettingbot-tests.yml`) em cada
-push/PR que toque na pasta `bettingbot/`.
+odds (formato normalizado e formato bruto da The Odds API), o modelo de
+Poisson e o cálculo de forças de ataque/defesa, e as regras de quando o
+executor pode ou não executar uma ordem real. Correm automaticamente em CI
+(`.github/workflows/bettingbot-tests.yml`) em cada push/PR que toque na
+pasta `bettingbot/`.
 
 ## Estrutura do projeto
 
-- `config.py` — todos os parâmetros (odds, deteção, risco, execução)
+- `config.py` — todos os parâmetros (odds, deteção, modelo, risco, execução)
 - `app/odds.py` — obtenção de odds (The Odds API ou JSON local)
 - `app/arbitrage.py` — deteção de arbitragem e de apostas de valor
+- `app/stats.py` — estatísticas de golos por equipa (football-data.org)
+- `app/poisson.py` — modelo de Poisson (golos esperados → probabilidades)
+- `app/model.py` — compara o modelo com as odds de mercado
 - `app/staking.py` — dimensionamento de apostas (Kelly fracionado)
 - `app/notifier.py` — alertas por Telegram
 - `app/betfair_client.py` — cliente da Betfair Exchange (execução real)
 - `app/executor.py` — execução de apostas (paper ou real, só Betfair)
-- `app/live.py` — loop de verificação contínua
-- `main.py` — CLI (`arbitragem` / `valor` / `live`)
+- `app/live.py` — loop de verificação contínua e resumo diário
+- `main.py` — CLI (`arbitragem` / `valor` / `modelo` / `resumo` / `desportos` / `live`)
 - `data/exemplo_odds.json` — dados de exemplo para testar sem API key
 - `tests/` — testes automatizados (pytest)
 
 ## Limitações atuais (é um MVP)
 
-- Mercados só de vencedor (`h2h`) — sem over/under, handicaps, etc.
-- "Valor" é uma heurística sobre o consenso do mercado, não um modelo
-  preditivo próprio treinado em dados históricos do desporto.
+- Mercados de odds só de vencedor (`h2h`) — sem over/under, handicaps, etc.
+  integrados com odds reais (o modelo calcula over/under e BTTS, mas ainda
+  sem odds desses mercados para comparar).
+- "Valor" (comparação entre casas) é uma heurística sobre o consenso do
+  mercado. O `modelo` (comparação com golos reais) é mais parecido com uma
+  previsão própria, mas continua a ser um modelo simples (média da época,
+  sem lesões/suspensões/contexto) — nenhum dos dois garante lucro.
 - Sem backtesting histórico real: ao contrário de preços de criptomoedas,
   odds históricas com resultados liquidados não estão disponíveis de forma
   simples e gratuita — o bot só analisa odds ao vivo/pré-jogo.
+- Correspondência de nomes de equipas entre a The Odds API e a
+  football-data.org é por normalização simples (remove sufixos como "FC",
+  baixa maiúsculas) — pode falhar em nomes muito diferentes entre as duas
+  fontes.
 - Execução automática limitada à Betfair Exchange, e ainda sem o mapeamento
   automático evento → `market_id`/`selection_id` da Betfair (ver secção
   acima).
@@ -256,7 +317,10 @@ push/PR que toque na pasta `bettingbot/`.
 - Mapeamento automático de eventos da The Odds API para mercados da
   Betfair (via `list_market_catalogue`), para a execução real ficar
   completa.
-- Mais mercados (over/under, handicaps asiáticos).
+- Integrar odds reais de over/under e BTTS, para o modelo comparar essas
+  previsões com o mercado (não só o 1X2).
+- Modelo com peso maior para jogos recentes (ex: decaimento exponencial)
+  em vez de média simples da época.
 - Registo em base de dados do histórico de oportunidades e apostas
   simuladas, para avaliar a estratégia ao longo do tempo (equivalente ao
   que o `cryptobot` já mostrou: comparar sempre com o resultado de "não

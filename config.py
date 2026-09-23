@@ -28,6 +28,14 @@ ODD_MAXIMA_VALOR = float(os.getenv("ODD_MAXIMA_VALOR", 4.0))
 # licenciadas na tua jurisdição ou pouco fiáveis do cálculo.
 BOOKMAKERS_FIAVEIS = [b.strip() for b in os.getenv("BOOKMAKERS_FIAVEIS", "").split(",") if b.strip()]
 
+# --- Modelo estatístico próprio (golos, ver app/stats.py e app/poisson.py) ---
+# Estatísticas de golos via football-data.org (free tier, cobre as
+# principais ligas europeias): https://www.football-data.org/client/register
+FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
+FOOTBALL_DATA_BASE_URL = os.getenv("FOOTBALL_DATA_BASE_URL", "https://api.football-data.org/v4")
+MODELO_JOGOS_HISTORICO = int(os.getenv("MODELO_JOGOS_HISTORICO", 200))  # jogos terminados usados para calcular forças
+MODELO_MARGEM_MINIMA = float(os.getenv("MODELO_MARGEM_MINIMA", 0.05))   # mais exigente que o valor de mercado — o modelo também pode estar errado
+
 # --- Gestão de risco ⚠️ revê sempre antes de arriscar dinheiro real ---
 CAPITAL_INICIAL = float(os.getenv("CAPITAL_INICIAL", 100))     # unidades monetárias (ex: EUR)
 STAKE_MAXIMA_POR_APOSTA = float(os.getenv("STAKE_MAXIMA_POR_APOSTA", 10))
