@@ -9,7 +9,7 @@ from app.live import correr_loop, resumo_diario
 from app.model import avaliar_evento, encontrar_nome_equivalente
 from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos, proxima_data_com_jogos
 from app.poisson import golos_esperados, probabilidades
-from app.stats import buscar_jogos_terminados, calcular_forcas
+from app.stats import buscar_jogos_terminados, calcular_forcas, listar_competicoes
 
 
 def _resolver_desportos(args) -> list:
@@ -89,6 +89,16 @@ def cmd_desportos(args):
     for d in listar_desportos(args.filtro):
         estado = "" if d.get("active", True) else "  (inativo)"
         print(f"{d['key']:40s} {d.get('title', '')}{estado}")
+
+
+def cmd_competicoes(args):
+    competicoes = listar_competicoes(args.filtro)
+    if not competicoes:
+        print("Nenhuma competição encontrada (ou o teu plano da football-data.org não a inclui).")
+        return
+    for c in competicoes:
+        area = (c.get("area") or {}).get("name", "")
+        print(f"{c.get('code', '?'):8s} {c.get('name', ''):40s} {area}")
 
 
 def _correr_modelo_competicao(competicao: str, desporto: str, args) -> dict:
@@ -253,6 +263,13 @@ def main():
     p_desportos = subparsers.add_parser("desportos", help="lista as chaves de desporto/competição disponíveis na The Odds API")
     p_desportos.add_argument("--filtro", help="texto a procurar na chave/título/descrição, ex: 'nations' ou 'portugal'")
     p_desportos.set_defaults(func=cmd_desportos)
+
+    p_competicoes = subparsers.add_parser(
+        "competicoes",
+        help="lista os códigos de competição disponíveis na football-data.org (para usar em `modelo --competicao`)",
+    )
+    p_competicoes.add_argument("--filtro", help="texto a procurar no nome/código/país, ex: 'nations' ou 'portugal'")
+    p_competicoes.set_defaults(func=cmd_competicoes)
 
     p_modelo = subparsers.add_parser(
         "modelo",

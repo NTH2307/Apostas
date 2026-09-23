@@ -75,6 +75,26 @@ def _evento_modelo(desporto, casa, fora):
     }
 
 
+def test_cmd_competicoes_imprime_codigo_nome_e_pais(monkeypatch, capsys):
+    monkeypatch.setattr(main, "listar_competicoes", lambda filtro: [
+        {"code": "PPL", "name": "Primeira Liga", "area": {"name": "Portugal"}},
+    ])
+    args = argparse.Namespace(filtro="portugal")
+    main.cmd_competicoes(args)
+    saida = capsys.readouterr().out
+    assert "PPL" in saida
+    assert "Primeira Liga" in saida
+    assert "Portugal" in saida
+
+
+def test_cmd_competicoes_sem_resultados_avisa(monkeypatch, capsys):
+    monkeypatch.setattr(main, "listar_competicoes", lambda filtro: [])
+    args = argparse.Namespace(filtro="inexistente")
+    main.cmd_competicoes(args)
+    saida = capsys.readouterr().out
+    assert "Nenhuma competição" in saida
+
+
 def test_cmd_modelo_sem_competicao_nem_todas_avisa_e_nao_rebenta(capsys):
     args = argparse.Namespace(competicao=None, desporto=None, todas=False)
     main.cmd_modelo(args)

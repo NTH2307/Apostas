@@ -36,6 +36,39 @@ def buscar_jogos_terminados(competicao: str, limite: int = 200) -> list[dict]:
     return _normalizar_jogos(jogos)[:limite]
 
 
+def listar_competicoes(filtro: str | None = None) -> list[dict]:
+    """Lista as competições disponíveis no teu plano da football-data.org
+    (o código a usar em `--competicao`) — para encontrares a chave certa em
+    vez de adivinhar (ex: para a Liga das Nações). `filtro` procura (sem
+    distinguir maiúsculas/minúsculas) no nome ou código."""
+    if not config.FOOTBALL_DATA_API_KEY:
+        raise RuntimeError(
+            "FOOTBALL_DATA_API_KEY não configurada — cria uma chave grátis em "
+            "https://www.football-data.org/client/register e define "
+            "FOOTBALL_DATA_API_KEY no .env."
+        )
+    resposta = requests.get(
+        f"{config.FOOTBALL_DATA_BASE_URL}/competitions",
+        headers={"X-Auth-Token": config.FOOTBALL_DATA_API_KEY},
+        timeout=15,
+    )
+    resposta.raise_for_status()
+    competicoes = resposta.json().get("competitions", [])
+    return _filtrar_competicoes(competicoes, filtro)
+
+
+def _filtrar_competicoes(competicoes: list[dict], filtro: str | None) -> list[dict]:
+    if not filtro:
+        return competicoes
+    filtro_lower = filtro.lower()
+    return [
+        c for c in competicoes
+        if filtro_lower in c.get("name", "").lower()
+        or filtro_lower in c.get("code", "").lower()
+        or filtro_lower in (c.get("area") or {}).get("name", "").lower()
+    ]
+
+
 def _pedir_com_retry_em_429(competicao: str, tentativas: int = 2):
     for tentativa in range(tentativas):
         resposta = requests.get(

@@ -1,7 +1,7 @@
 import pytest
 
 import app.stats as stats
-from app.stats import buscar_jogos_terminados, calcular_forcas
+from app.stats import _filtrar_competicoes, buscar_jogos_terminados, calcular_forcas, listar_competicoes
 
 
 class _RespostaFalsa:
@@ -110,3 +110,33 @@ def test_buscar_jogos_terminados_desiste_apos_429_persistente(monkeypatch):
 
     with pytest.raises(Exception):
         buscar_jogos_terminados("PL")
+
+
+def test_filtrar_competicoes_sem_filtro_devolve_tudo():
+    competicoes = [{"code": "PL", "name": "Premier League"}, {"code": "EC", "name": "European Championship"}]
+    assert _filtrar_competicoes(competicoes, None) == competicoes
+
+
+def test_filtrar_competicoes_procura_por_nome_codigo_ou_pais():
+    competicoes = [
+        {"code": "EC", "name": "European Championship", "area": {"name": "Europe"}},
+        {"code": "PPL", "name": "Primeira Liga", "area": {"name": "Portugal"}},
+    ]
+    assert [c["code"] for c in _filtrar_competicoes(competicoes, "portugal")] == ["PPL"]
+    assert [c["code"] for c in _filtrar_competicoes(competicoes, "european")] == ["EC"]
+    assert _filtrar_competicoes(competicoes, "inexistente") == []
+
+
+def test_listar_competicoes_sem_api_key(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "")
+    with pytest.raises(RuntimeError):
+        listar_competicoes()
+
+
+def test_listar_competicoes_sucesso(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "chave-falsa")
+    corpo = {"competitions": [{"code": "PL", "name": "Premier League", "area": {"name": "England"}}]}
+    monkeypatch.setattr(stats.requests, "get", lambda *a, **k: _RespostaFalsa(200, corpo))
+
+    competicoes = listar_competicoes()
+    assert competicoes[0]["code"] == "PL"

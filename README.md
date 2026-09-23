@@ -163,9 +163,12 @@ python main.py modelo --competicao PL --desporto soccer_epl --amanha
 
 - `--competicao`: código da competição na **football-data.org** (ex: `PL`
   Premier League, `PD` La Liga, `SA` Serie A, `BL1` Bundesliga, `FL1`
-  Ligue 1, `PPL` Primeira Liga, `CL` Champions League — [lista
-  completa](https://www.football-data.org/documentation/api) na
-  documentação deles).
+  Ligue 1, `PPL` Primeira Liga, `CL` Champions League). Usa
+  `python main.py competicoes --filtro <termo>` para encontrares o código
+  exato de qualquer competição coberta pelo teu plano (ex: `--filtro
+  nations` para a Liga das Nações, `--filtro europeu` para o Europeu) —
+  **não adivinhes o código**, alguns são pouco óbvios e o comando confirma
+  se a competição está mesmo disponível.
 - `--desporto`: a chave da **mesma** competição na The Odds API (ex:
   `soccer_epl`) — usa `python main.py desportos --filtro <termo>` para
   encontrares a correspondente.
@@ -197,6 +200,18 @@ registada no resumo final e não trava as restantes. **Isto só cobre
 futebol** — o modelo de Poisson e a football-data.org não servem para
 basquetebol (é um desporto de pontuação muito diferente, precisaria de
 outro modelo e outra fonte de dados).
+
+Para adicionares mais competições (ex: Liga das Nações, outras ligas),
+edita `COMPETICOES_MODELO` no `.env` no formato
+`código_football_data:chave_the_odds_api`, separados por vírgula — usa
+`competicoes --filtro` e `desportos --filtro` para confirmares os dois
+códigos antes de adicionares:
+
+```bash
+python main.py competicoes --filtro nations
+python main.py desportos --filtro nations
+# .env: COMPETICOES_MODELO=PL:soccer_epl,...,<código_encontrado>:<chave_encontrada>
+```
 
 Para cada jogo mostra sempre: os golos esperados do modelo, a probabilidade
 1X2 do modelo (e o favorito segundo o modelo), e a opinião do modelo sobre
