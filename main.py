@@ -1,12 +1,13 @@
 """CLI do BettingBot: `arbitragem`, `valor`, `desportos` ou `live`."""
 import argparse
+import time
 from datetime import date
 
 import config
 from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.live import correr_loop, resumo_diario
 from app.model import avaliar_evento, encontrar_nome_equivalente
-from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos
+from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos, proxima_data_com_jogos
 from app.poisson import golos_esperados, probabilidades
 from app.stats import buscar_jogos_terminados, calcular_forcas
 
@@ -101,10 +102,25 @@ def _correr_modelo_competicao(competicao: str, desporto: str, args) -> dict:
         return {"discrepancias": 0, "jogos": 0, "sem_dados": 0}
     print(f"\n=== {competicao} ({desporto}) — modelo a partir de {len(jogos)} jogos terminados ===")
 
-    eventos = buscar_odds(desporto)
+    eventos_todos = buscar_odds(desporto)
     dia = date.fromisoformat(args.dia) if getattr(args, "dia", None) else (amanha() if getattr(args, "amanha", False) else None)
+    if dia is None:
+        # sem --dia/--amanha: por omissão mostra só a PRÓXIMA jornada (data
+        # mais próxima com jogos), em vez de despejar todas as jornadas
+        # futuras misturadas sem indicar a quê dia pertence cada jogo.
+        dia = proxima_data_com_jogos(eventos_todos)
+
+    eventos = filtrar_por_dia(eventos_todos, dia) if dia else eventos_todos
+    if dia and not eventos:
+        proxima = proxima_data_com_jogos(eventos_todos)
+        if proxima:
+            print(f"  sem jogos em {dia.isoformat()} — próxima data com jogos: {proxima.isoformat()} (usa --dia {proxima.isoformat()})")
+        else:
+            print("  sem jogos agendados de todo nesta competição, neste momento.")
+        return {"discrepancias": 0, "jogos": 0, "sem_dados": 0}
     if dia:
-        eventos = filtrar_por_dia(eventos, dia)
+        print(f"  a mostrar jogos de {dia.isoformat()}")
+
     bookmakers = args.bookmakers.split(",") if getattr(args, "bookmakers", None) else config.BOOKMAKERS_FIAVEIS
     eventos = [filtrar_bookmakers(e, bookmakers) for e in eventos]
 
@@ -155,7 +171,12 @@ def cmd_modelo(args):
 
     total = {"discrepancias": 0, "jogos": 0, "sem_dados": 0}
     falhas = []
-    for competicao, desporto in pares:
+    for indice, (competicao, desporto) in enumerate(pares):
+        if indice > 0:
+            # football-data.org free tier: 10 pedidos/minuto — espaça os
+            # pedidos para não estourares o limite a meio de --todas
+            # (mesmo assim, buscar_jogos_terminados tem retry se acontecer).
+            time.sleep(7)
         try:
             resultado = _correr_modelo_competicao(competicao, desporto, args)
         except Exception as e:

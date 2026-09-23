@@ -1,6 +1,21 @@
 import pytest
 
-from app.stats import calcular_forcas
+import app.stats as stats
+from app.stats import buscar_jogos_terminados, calcular_forcas
+
+
+class _RespostaFalsa:
+    def __init__(self, status_code, corpo=None, headers=None):
+        self.status_code = status_code
+        self._corpo = corpo or {}
+        self.headers = headers or {}
+
+    def json(self):
+        return self._corpo
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise Exception(f"HTTP {self.status_code}")
 
 
 def test_calcular_forcas_com_lista_vazia():
@@ -45,3 +60,53 @@ def test_calcular_forcas_equipa_so_com_jogos_em_casa_fica_neutra_fora():
     b = forcas["equipas"]["B"]
     assert b["ataque_casa"] == 1.0
     assert b["defesa_casa"] == 1.0
+
+
+def _corpo_com_um_jogo():
+    return {"matches": [{
+        "utcDate": "2026-09-20T15:00:00Z",
+        "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
+        "score": {"fullTime": {"home": 2, "away": 1}},
+    }]}
+
+
+def test_buscar_jogos_terminados_sem_api_key(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "")
+    with pytest.raises(RuntimeError):
+        buscar_jogos_terminados("PL")
+
+
+def test_buscar_jogos_terminados_sucesso_direto(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "chave-falsa")
+    monkeypatch.setattr(stats.requests, "get", lambda *a, **k: _RespostaFalsa(200, _corpo_com_um_jogo()))
+
+    jogos = buscar_jogos_terminados("PL")
+    assert len(jogos) == 1
+    assert jogos[0]["casa"] == "A"
+
+
+def test_buscar_jogos_terminados_repete_apos_429(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "chave-falsa")
+    chamadas = []
+
+    def _get_falso(*args, **kwargs):
+        chamadas.append(1)
+        if len(chamadas) == 1:
+            return _RespostaFalsa(429, headers={"Retry-After": "0"})
+        return _RespostaFalsa(200, _corpo_com_um_jogo())
+
+    monkeypatch.setattr(stats.requests, "get", _get_falso)
+    monkeypatch.setattr(stats.time, "sleep", lambda segundos: None)
+
+    jogos = buscar_jogos_terminados("PL")
+    assert len(chamadas) == 2
+    assert len(jogos) == 1
+
+
+def test_buscar_jogos_terminados_desiste_apos_429_persistente(monkeypatch):
+    monkeypatch.setattr("config.FOOTBALL_DATA_API_KEY", "chave-falsa")
+    monkeypatch.setattr(stats.requests, "get", lambda *a, **k: _RespostaFalsa(429, headers={"Retry-After": "0"}))
+    monkeypatch.setattr(stats.time, "sleep", lambda segundos: None)
+
+    with pytest.raises(Exception):
+        buscar_jogos_terminados("PL")

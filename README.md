@@ -172,6 +172,16 @@ python main.py modelo --competicao PL --desporto soccer_epl --amanha
 - Precisa de `FOOTBALL_DATA_API_KEY` no `.env` — cria uma chave grátis em
   [football-data.org/client/register](https://www.football-data.org/client/register).
 
+Sem `--dia`/`--amanha`, mostra por omissão só a **próxima data com jogos**
+agendados nessa competição (não despeja todas as jornadas futuras
+misturadas) — e se pedires um dia sem jogos, diz-te qual é a próxima data
+que tem, para ajustares o `--dia`.
+
+⚠️ O free tier da football-data.org limita a 10 pedidos/minuto — `--todas`
+espaça os pedidos automaticamente (~7s entre competições) para não
+estourar o limite; se mesmo assim acontecer, tenta repetir uma vez
+sozinho antes de desistir.
+
 ### Todas as ligas principais de uma vez
 
 Em vez de correres liga a liga, `--todas` corre o modelo em todas as
@@ -319,9 +329,11 @@ pasta `bettingbot/`.
   odds históricas com resultados liquidados não estão disponíveis de forma
   simples e gratuita — o bot só analisa odds ao vivo/pré-jogo.
 - Correspondência de nomes de equipas entre a The Odds API e a
-  football-data.org é por normalização simples (remove sufixos como "FC",
-  baixa maiúsculas) — pode falhar em nomes muito diferentes entre as duas
-  fontes.
+  football-data.org é por normalização simples (remove acentos, pontuação,
+  e tokens comuns de clube como "FC"/"AFC" do início ou fim do nome) —
+  ajuda em casos comuns ("FC Barcelona" ↔ "Barcelona") mas pode falhar em
+  nomes muito diferentes entre as duas fontes (traduções, abreviaturas
+  pouco usuais).
 - Execução automática limitada à Betfair Exchange, e ainda sem o mapeamento
   automático evento → `market_id`/`selection_id` da Betfair (ver secção
   acima).

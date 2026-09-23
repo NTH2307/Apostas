@@ -97,9 +97,59 @@ def test_cmd_modelo_uma_competicao(monkeypatch, capsys):
     assert "1 jogo(s) analisados em 1 competição" in saida
 
 
+def test_cmd_modelo_por_omissao_mostra_so_a_data_mais_proxima_com_jogos(monkeypatch, capsys):
+    jogos = [{"casa": "Time A", "fora": "Time B", "golos_casa": 2, "golos_fora": 0}]
+    monkeypatch.setattr(main, "buscar_jogos_terminados", lambda competicao, limite: jogos)
+    eventos = [
+        {
+            "id": "longe", "desporto": "soccer_teste", "hora_inicio": "2026-10-10T15:00:00Z",
+            "equipas": ["Time C", "Time D"], "bookmakers": {},
+        },
+        {
+            "id": "perto", "desporto": "soccer_teste", "hora_inicio": "2026-09-25T15:00:00Z",
+            "equipas": ["Time A", "Time B"],
+            "bookmakers": {"Casa X": {"Time A": 1.9, "Draw": 3.4, "Time B": 4.0}},
+        },
+    ]
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: eventos)
+
+    args = argparse.Namespace(
+        competicao="TESTE", desporto="soccer_teste", todas=False, jogos_historico=200,
+        margem_minima=0.05, bookmakers=None, amanha=False, dia=None,
+    )
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "Time A vs Time B" in saida
+    assert "Time C vs Time D" not in saida
+    assert "2026-09-25" in saida
+
+
+def test_cmd_modelo_avisa_proxima_data_quando_dia_pedido_nao_tem_jogos(monkeypatch, capsys):
+    jogos = [{"casa": "Time A", "fora": "Time B", "golos_casa": 2, "golos_fora": 0}]
+    monkeypatch.setattr(main, "buscar_jogos_terminados", lambda competicao, limite: jogos)
+    eventos = [
+        {
+            "id": "e1", "desporto": "soccer_teste", "hora_inicio": "2026-09-30T15:00:00Z",
+            "equipas": ["Time A", "Time B"],
+            "bookmakers": {"Casa X": {"Time A": 1.9, "Draw": 3.4, "Time B": 4.0}},
+        },
+    ]
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: eventos)
+
+    args = argparse.Namespace(
+        competicao="TESTE", desporto="soccer_teste", todas=False, jogos_historico=200,
+        margem_minima=0.05, bookmakers=None, amanha=False, dia="2026-09-24",
+    )
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "próxima data com jogos: 2026-09-30" in saida
+    assert "Time A vs Time B" not in saida
+
+
 def test_cmd_modelo_todas_soma_varias_competicoes(monkeypatch, capsys):
     import config
     monkeypatch.setattr(config, "COMPETICOES_MODELO", [("C1", "soccer_c1"), ("C2", "soccer_c2")])
+    monkeypatch.setattr(main.time, "sleep", lambda segundos: None)
 
     jogos_por_competicao = {
         "C1": [{"casa": "A", "fora": "B", "golos_casa": 1, "golos_fora": 0}],
@@ -124,6 +174,7 @@ def test_cmd_modelo_todas_soma_varias_competicoes(monkeypatch, capsys):
 def test_cmd_modelo_todas_uma_competicao_falha_nao_para_as_outras(monkeypatch, capsys):
     import config
     monkeypatch.setattr(config, "COMPETICOES_MODELO", [("QUEBRADA", "soccer_x"), ("C2", "soccer_c2")])
+    monkeypatch.setattr(main.time, "sleep", lambda segundos: None)
 
     def _buscar_jogos(competicao, limite):
         if competicao == "QUEBRADA":

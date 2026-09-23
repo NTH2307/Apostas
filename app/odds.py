@@ -118,6 +118,21 @@ def filtrar_por_dia(eventos: list[dict], dia: date, fuso: str = FUSO_PADRAO) -> 
     return filtrados
 
 
+def proxima_data_com_jogos(eventos: list[dict], fuso: str = FUSO_PADRAO) -> date | None:
+    """A data (no fuso indicado, omissão hora de Portugal) do jogo mais
+    próximo entre `eventos` — útil para saber "quando é a próxima jornada"
+    quando um dia pedido (ex: amanhã) não tem jogos. None se a lista
+    estiver vazia ou nenhum evento tiver `hora_inicio`."""
+    zona = ZoneInfo(fuso)
+    datas = []
+    for evento in eventos:
+        hora = evento.get("hora_inicio")
+        if not hora:
+            continue
+        datas.append(datetime.fromisoformat(hora.replace("Z", "+00:00")).astimezone(zona).date())
+    return min(datas) if datas else None
+
+
 def _normalizar_evento(evento: dict, desporto: str) -> dict:
     bookmakers = {}
     for bookmaker in evento.get("bookmakers", []):

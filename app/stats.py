@@ -7,6 +7,8 @@ de cada equipa, input do modelo de Poisson (ver app/poisson.py).
 mais recentes) — é uma média da época, não "forma recente" no sentido
 estrito.
 """
+import time
+
 import requests
 
 import config
@@ -16,6 +18,9 @@ def buscar_jogos_terminados(competicao: str, limite: int = 200) -> list[dict]:
     """Jogos já terminados de uma competição (código football-data.org, ex:
     'PL', 'PD', 'SA', 'BL1', 'FL1', 'PPL', 'CL'), mais recentes primeiro.
     Cada jogo: {"casa": str, "fora": str, "golos_casa": int, "golos_fora": int, "data": str}.
+
+    Se o free tier limitar o número de pedidos por minuto (HTTP 429), espera
+    pelo tempo indicado em Retry-After e tenta mais uma vez antes de desistir.
     """
     if not config.FOOTBALL_DATA_API_KEY:
         raise RuntimeError(
@@ -23,16 +28,29 @@ def buscar_jogos_terminados(competicao: str, limite: int = 200) -> list[dict]:
             "https://www.football-data.org/client/register e define "
             "FOOTBALL_DATA_API_KEY no .env."
         )
-    resposta = requests.get(
-        f"{config.FOOTBALL_DATA_BASE_URL}/competitions/{competicao}/matches",
-        headers={"X-Auth-Token": config.FOOTBALL_DATA_API_KEY},
-        params={"status": "FINISHED"},
-        timeout=15,
-    )
+
+    resposta = _pedir_com_retry_em_429(competicao)
     resposta.raise_for_status()
     jogos = resposta.json().get("matches", [])
     jogos = sorted(jogos, key=lambda j: j["utcDate"], reverse=True)
     return _normalizar_jogos(jogos)[:limite]
+
+
+def _pedir_com_retry_em_429(competicao: str, tentativas: int = 2):
+    for tentativa in range(tentativas):
+        resposta = requests.get(
+            f"{config.FOOTBALL_DATA_BASE_URL}/competitions/{competicao}/matches",
+            headers={"X-Auth-Token": config.FOOTBALL_DATA_API_KEY},
+            params={"status": "FINISHED"},
+            timeout=15,
+        )
+        if resposta.status_code == 429 and tentativa < tentativas - 1:
+            espera = int(resposta.headers.get("Retry-After", 60))
+            print(f"[football-data.org] limite de pedidos/minuto atingido — a aguardar {espera}s e a repetir '{competicao}'...")
+            time.sleep(espera)
+            continue
+        return resposta
+    return resposta
 
 
 def _normalizar_jogos(jogos_brutos: list[dict]) -> list[dict]:

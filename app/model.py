@@ -11,12 +11,21 @@ Nota: over/under 2.5 golos e "ambas marcam" (BTTS) são calculados pelo
 modelo (ver app/poisson.py) mas ainda não comparados com odds de mercado
 para esses mercados — só o mercado h2h/vencedor está integrado.
 """
+import re
+import unicodedata
 from dataclasses import dataclass
 
 from app.arbitrage import melhores_odds_por_resultado
 from app.poisson import golos_esperados, probabilidades
 
-SUFIXOS_CLUBE = (" fc", " cf", " afc", " sc", " cd", " ac", " ud", " sad")
+# Tokens comuns de nome de clube que aparecem tanto como prefixo ("FC
+# Barcelona", "AFC Bournemouth", "1. FC Köln") como sufixo ("Arsenal FC",
+# "Sporting CP" — "cp"/"sad"/"ud" são comuns em Portugal), consoante a
+# fonte de dados — por isso removemos de ambos os lados, não só do fim.
+TOKENS_RUIDO_CLUBE = frozenset({
+    "1", "fc", "cf", "afc", "sc", "ac", "cd", "ud", "sad", "cp", "sv", "ssv",
+    "vfb", "vfl", "tsg", "sg", "spvgg", "bv", "sk", "if", "bk", "fk",
+})
 
 
 @dataclass
@@ -32,14 +41,22 @@ class OportunidadeModelo:
 
 
 def normalizar_nome_equipa(nome: str) -> str:
-    """Remove sufixos comuns de clube (FC, CF, AFC, ...) e baixa para
-    comparar nomes de equipas entre fontes diferentes — a football-data.org
-    costuma usar 'Arsenal FC', a The Odds API costuma usar só 'Arsenal'."""
-    nome_norm = nome.strip().lower()
-    for sufixo in SUFIXOS_CLUBE:
-        if nome_norm.endswith(sufixo):
-            nome_norm = nome_norm[: -len(sufixo)].strip()
-    return nome_norm
+    """Normaliza um nome de equipa para comparar entre fontes de dados
+    diferentes: remove acentos e pontuação, baixa maiúsculas, e retira
+    tokens comuns de clube (FC, AFC, CF, ...) do INÍCIO ou do FIM do nome
+    — a football-data.org costuma usar 'FC Barcelona'/'AFC Bournemouth',
+    a The Odds API costuma usar só 'Barcelona'/'Bournemouth'.
+
+    ⚠️ É uma normalização best-effort, não uma correspondência garantida —
+    nomes muito diferentes entre as duas fontes (traduções, abreviaturas
+    pouco comuns) continuam a poder falhar. Ver README, limitações."""
+    sem_acentos = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    tokens = re.findall(r"[a-z0-9]+", sem_acentos.lower())
+    while tokens and tokens[0] in TOKENS_RUIDO_CLUBE:
+        tokens = tokens[1:]
+    while tokens and tokens[-1] in TOKENS_RUIDO_CLUBE:
+        tokens = tokens[:-1]
+    return " ".join(tokens)
 
 
 def encontrar_nome_equivalente(nome: str, nomes_disponiveis):

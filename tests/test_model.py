@@ -1,10 +1,17 @@
 from app.model import avaliar_evento, encontrar_nome_equivalente, normalizar_nome_equipa
 
 
-def test_normalizar_nome_equipa_remove_sufixos_comuns():
+def test_normalizar_nome_equipa_remove_sufixos_e_prefixos_comuns():
     assert normalizar_nome_equipa("Arsenal FC") == "arsenal"
-    assert normalizar_nome_equipa("Sporting CP") == "sporting cp"  # "cp" não está na lista de sufixos removidos
+    assert normalizar_nome_equipa("FC Barcelona") == "barcelona"
+    assert normalizar_nome_equipa("AFC Bournemouth") == "bournemouth"
+    assert normalizar_nome_equipa("Sporting CP") == "sporting"
     assert normalizar_nome_equipa("Manchester City") == "manchester city"
+
+
+def test_normalizar_nome_equipa_remove_acentos_e_pontuacao():
+    assert normalizar_nome_equipa("1. FC Köln") == "koln"
+    assert normalizar_nome_equipa("Deportivo La Coruña") == "deportivo la coruna"
 
 
 def test_encontrar_nome_equivalente_ignora_sufixo_e_maiusculas():

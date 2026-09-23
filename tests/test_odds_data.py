@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.odds import _filtrar_desportos, filtrar_por_dia
+from app.odds import _filtrar_desportos, filtrar_por_dia, proxima_data_com_jogos
 
 
 def _evento(id_, hora_inicio):
@@ -23,6 +23,20 @@ def test_filtrar_por_dia_perto_da_meia_noite_muda_de_dia_com_o_fuso():
     eventos = [_evento("perto_da_meia_noite", "2026-09-27T23:30:00Z")]
     assert [e["id"] for e in filtrar_por_dia(eventos, date(2026, 9, 28))] == ["perto_da_meia_noite"]
     assert filtrar_por_dia(eventos, date(2026, 9, 27)) == []
+
+
+def test_proxima_data_com_jogos_devolve_a_data_mais_cedo():
+    eventos = [
+        _evento("depois", "2026-10-05T20:00:00Z"),
+        _evento("mais_cedo", "2026-09-28T20:00:00Z"),
+        _evento("sem_hora", ""),
+    ]
+    assert proxima_data_com_jogos(eventos) == date(2026, 9, 28)
+
+
+def test_proxima_data_com_jogos_sem_eventos_devolve_none():
+    assert proxima_data_com_jogos([]) is None
+    assert proxima_data_com_jogos([_evento("sem_hora", "")]) is None
 
 
 def test_filtrar_desportos_sem_filtro_devolve_tudo():
