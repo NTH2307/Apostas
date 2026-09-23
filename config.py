@@ -37,14 +37,19 @@ MODELO_JOGOS_HISTORICO = int(os.getenv("MODELO_JOGOS_HISTORICO", 200))  # jogos 
 MODELO_MARGEM_MINIMA = float(os.getenv("MODELO_MARGEM_MINIMA", 0.05))   # mais exigente que o valor de mercado — o modelo também pode estar errado
 
 # Pares "código football-data.org:chave The Odds API" para `modelo --todas`
-# (as principais ligas europeias de futebol — o modelo de Poisson só serve
-# para futebol, não basquetebol). Edita à vontade; separa pares por vírgula.
+# — todas as competições de futebol de clubes cobertas pelo free tier da
+# football-data.org (o modelo de Poisson só serve para futebol, não
+# basquetebol; competições de seleções como a Liga das Nações não estão
+# disponíveis no free tier — usa `python main.py competicoes` para
+# confirmares o que o teu plano cobre). Edita à vontade; separa por vírgula.
 COMPETICOES_MODELO = [
     tuple(par.split(":")) for par in os.getenv(
         "COMPETICOES_MODELO",
         "PL:soccer_epl,PD:soccer_spain_la_liga,SA:soccer_italy_serie_a,"
         "BL1:soccer_germany_bundesliga,FL1:soccer_france_ligue_one,"
-        "PPL:soccer_portugal_primeira_liga,CL:soccer_uefa_champs_league",
+        "PPL:soccer_portugal_primeira_liga,CL:soccer_uefa_champs_league,"
+        "ELC:soccer_efl_champ,DED:soccer_netherlands_eredivisie,"
+        "BSA:soccer_brazil_campeonato,CLI:soccer_conmebol_copa_libertadores",
     ).split(",") if par.strip()
 ]
 

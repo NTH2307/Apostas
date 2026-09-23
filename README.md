@@ -188,8 +188,10 @@ sozinho antes de desistir.
 ### Todas as ligas principais de uma vez
 
 Em vez de correres liga a liga, `--todas` corre o modelo em todas as
-competições de `COMPETICOES_MODELO` (.env — por omissão: Premier League,
-La Liga, Serie A, Bundesliga, Ligue 1, Primeira Liga, Champions League):
+competições de `COMPETICOES_MODELO` (.env — por omissão, as 11 competições
+de futebol de clubes cobertas pelo free tier da football-data.org: Premier
+League, La Liga, Serie A, Bundesliga, Ligue 1, Primeira Liga, Champions
+League, Championship inglês, Eredivisie, Brasileirão e Copa Libertadores):
 
 ```bash
 python main.py modelo --todas --amanha
@@ -201,15 +203,21 @@ futebol** — o modelo de Poisson e a football-data.org não servem para
 basquetebol (é um desporto de pontuação muito diferente, precisaria de
 outro modelo e outra fonte de dados).
 
-Para adicionares mais competições (ex: Liga das Nações, outras ligas),
+⚠️ **A Liga das Nações (e outras competições de seleções) não está
+disponível no free tier da football-data.org** — só cobre as 11
+competições de clubes acima (confirma sempre com
+`python main.py competicoes`, sem filtro, o que o teu plano tem). Não há
+forma de contornar isto sem mudar de fonte de dados para as estatísticas.
+
+Se quiseres adicionar outra competição de clubes que esteja no teu plano,
 edita `COMPETICOES_MODELO` no `.env` no formato
 `código_football_data:chave_the_odds_api`, separados por vírgula — usa
 `competicoes --filtro` e `desportos --filtro` para confirmares os dois
 códigos antes de adicionares:
 
 ```bash
-python main.py competicoes --filtro nations
-python main.py desportos --filtro nations
+python main.py competicoes --filtro brasil
+python main.py desportos --filtro brazil
 # .env: COMPETICOES_MODELO=PL:soccer_epl,...,<código_encontrado>:<chave_encontrada>
 ```
 
