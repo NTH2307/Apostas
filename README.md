@@ -141,6 +141,33 @@ python main.py valor --desporto soccer_epl --odd-maxima 4.0 --bookmakers "Betfai
 - `--odd-maxima` (ou `ODD_MAXIMA_VALOR` no `.env`, omissão 4.0, `0` desativa): ignora odds acima deste valor na deteção de **valor** (a arbitragem não é afetada — a garantia matemática dela não depende da magnitude da odd).
 - `--bookmakers` (ou `BOOKMAKERS_FIAVEIS` no `.env`, separados por vírgula, vazio = todas): restringe o cálculo — tanto o consenso de probabilidade "justa" como as odds candidatas — só a estas casas. Usa nomes exatamente como a The Odds API os devolve (aparecem no output do bot); serve para excluir casas não licenciadas na tua jurisdição ou de fiabilidade duvidosa.
 
+## Resumo diário (recomendado para uso do dia a dia)
+
+Em vez de correres `valor`/`arbitragem` à mão sempre que te lembras,
+`resumo` corre **uma vez** sobre todas as competições em `DESPORTOS` (no
+`.env`) e manda-te **sempre** uma mensagem de Telegram no fim — mesmo
+"nada encontrado hoje" — para saberes que a verificação correu (silêncio
+total seria ambíguo: bot avariado ou só sem oportunidades?).
+
+```bash
+python main.py resumo
+```
+
+Pensado para correr uma vez por dia via agendador, não à mão. No Windows,
+usa o **Agendador de Tarefas** (Task Scheduler):
+1. Cria uma tarefa nova → acionador "Diariamente" à hora que preferires.
+2. Ação "Iniciar um programa": aponta para o `python.exe` dentro do
+   `.venv` (ex: `C:\Users\<o teu utilizador>\reciboverde\bettingbot\.venv\Scripts\python.exe`),
+   com argumentos `main.py resumo` e "Iniciar em"
+   `C:\Users\<o teu utilizador>\reciboverde\bettingbot`.
+
+⚠️ Cuidado com o número de competições em `DESPORTOS`: o free tier da The
+Odds API é 500 pedidos/mês, e cada competição = 1 pedido por verificação
+(`resumo` só faz 1 verificação, `live` faz uma a cada
+`INTERVALO_VERIFICACAO_SEGUNDOS`). Com 8 competições, `resumo` 1x/dia fica
+bem dentro do limite (~240/mês) — não metas "todas as competições
+existentes" ou estouras a chave a meio do mês.
+
 ## Modo live (alertas e/ou execução automática)
 
 ```bash

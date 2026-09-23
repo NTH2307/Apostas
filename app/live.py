@@ -41,6 +41,47 @@ def verificar_uma_vez(desporto: str) -> dict:
     return resumo
 
 
+def resumo_diario(desportos: list | None = None) -> dict:
+    """Corre UMA verificação (não contínua) sobre `desportos` (omissão:
+    DESPORTOS no .env), e envia sempre um resumo por Telegram no fim —
+    mesmo "sem oportunidades hoje" — para saberes que a verificação correu
+    e não ficares às escuras. Pensado para correr uma vez por dia (ex: via
+    Agendador de Tarefas do Windows), ao contrário de `correr_loop`, que
+    corre para sempre.
+
+    Uma competição sem dados (chave errada, API em baixo, etc.) não pára as
+    restantes — fica só registada na secção de erros do resumo.
+    """
+    desportos = desportos or config.DESPORTOS
+    totais = {"arbitragens": 0, "valores": 0, "erros": []}
+
+    for desporto in desportos:
+        try:
+            resumo = verificar_uma_vez(desporto)
+            totais["arbitragens"] += resumo["arbitragens"]
+            totais["valores"] += resumo["valores"]
+        except Exception as e:
+            totais["erros"].append(f"{desporto}: {e}")
+
+    if totais["arbitragens"] or totais["valores"]:
+        texto = (
+            f"📋 Resumo diário: {totais['arbitragens']} arbitragem(ns) e "
+            f"{totais['valores']} aposta(s) de valor encontradas em "
+            f"{len(desportos)} competição(ões) — ver mensagens acima."
+        )
+    else:
+        texto = (
+            f"📋 Resumo diário: nada encontrado hoje em {len(desportos)} "
+            f"competição(ões). Mercado eficiente hoje, sem vantagem clara."
+        )
+    if totais["erros"]:
+        texto += "\n⚠️ Falhou a verificar: " + "; ".join(totais["erros"])
+
+    enviar_alerta(texto)
+    print(texto)
+    return totais
+
+
 def correr_loop():
     print(
         f"BettingBot em modo live: {', '.join(config.DESPORTOS)} "

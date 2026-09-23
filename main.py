@@ -4,7 +4,7 @@ from datetime import date
 
 import config
 from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
-from app.live import correr_loop
+from app.live import correr_loop, resumo_diario
 from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos
 
 
@@ -87,6 +87,10 @@ def cmd_desportos(args):
         print(f"{d['key']:40s} {d.get('title', '')}{estado}")
 
 
+def cmd_resumo(_args):
+    resumo_diario()
+
+
 def cmd_live(_args):
     correr_loop()
 
@@ -133,6 +137,12 @@ def main():
     p_desportos = subparsers.add_parser("desportos", help="lista as chaves de desporto/competição disponíveis na The Odds API")
     p_desportos.add_argument("--filtro", help="texto a procurar na chave/título/descrição, ex: 'nations' ou 'portugal'")
     p_desportos.set_defaults(func=cmd_desportos)
+
+    p_resumo = subparsers.add_parser(
+        "resumo",
+        help="corre UMA verificação sobre DESPORTOS (.env) e envia sempre um resumo por Telegram — pensado para correr 1x/dia via agendador",
+    )
+    p_resumo.set_defaults(func=cmd_resumo)
 
     p_live = subparsers.add_parser("live", help="corre o bot continuamente (alertas e/ou execução na Betfair)")
     p_live.set_defaults(func=cmd_live)
