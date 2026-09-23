@@ -1,0 +1,34 @@
+[
+  {
+    "id": "exemplo-1",
+    "desporto": "soccer_epl",
+    "hora_inicio": "2026-09-27T15:00:00Z",
+    "equipas": ["Time A", "Time B"],
+    "bookmakers": {
+      "Casa A": {"Time A": 1.90, "Time B": 2.05},
+      "Casa B": {"Time A": 2.10, "Time B": 1.85}
+    }
+  },
+  {
+    "id": "exemplo-2",
+    "desporto": "soccer_epl",
+    "hora_inicio": "2026-09-27T17:30:00Z",
+    "equipas": ["Time C", "Time D"],
+    "bookmakers": {
+      "Casa A": {"Time C": 2.30, "Empate": 3.10, "Time D": 3.20},
+      "Casa B": {"Time C": 2.10, "Empate": 3.40, "Time D": 3.50},
+      "Casa C": {"Time C": 2.05, "Empate": 3.30, "Time D": 3.80}
+    }
+  },
+  {
+    "id": "exemplo-3",
+    "desporto": "soccer_epl",
+    "hora_inicio": "2026-09-28T20:00:00Z",
+    "equipas": ["Time E", "Time F"],
+    "bookmakers": {
+      "Casa A": {"Time E": 1.95, "Time F": 1.95},
+      "Casa B": {"Time E": 1.93, "Time F": 1.97},
+      "Casa C": {"Time E": 1.97, "Time F": 1.93}
+    }
+  }
+]
