@@ -18,6 +18,16 @@ MERCADOS = os.getenv("MERCADOS", "h2h")         # h2h = vencedor (moneyline / 1X
 MARGEM_MINIMA_ARBITRAGEM = float(os.getenv("MARGEM_MINIMA_ARBITRAGEM", 0.01))  # 1% de lucro mínimo garantido
 MARGEM_MINIMA_VALOR = float(os.getenv("MARGEM_MINIMA_VALOR", 0.03))            # 3% acima da probabilidade justa estimada
 
+# Ignora apostas de valor em odds acima disto — em odds muito altas
+# (azarões), o "valor" calculado é muito mais sensível a ruído de uma única
+# bookmaker e ao "favorite-longshot bias" (ver README). None desativa o limite.
+ODD_MAXIMA_VALOR = float(os.getenv("ODD_MAXIMA_VALOR", 4.0))
+
+# Lista de bookmakers a considerar (nomes como aparecem na The Odds API,
+# separados por vírgula). Vazio = todas. Usa isto para excluir casas não
+# licenciadas na tua jurisdição ou pouco fiáveis do cálculo.
+BOOKMAKERS_FIAVEIS = [b.strip() for b in os.getenv("BOOKMAKERS_FIAVEIS", "").split(",") if b.strip()]
+
 # --- Gestão de risco ⚠️ revê sempre antes de arriscar dinheiro real ---
 CAPITAL_INICIAL = float(os.getenv("CAPITAL_INICIAL", 100))     # unidades monetárias (ex: EUR)
 STAKE_MAXIMA_POR_APOSTA = float(os.getenv("STAKE_MAXIMA_POR_APOSTA", 10))

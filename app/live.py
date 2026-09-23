@@ -5,7 +5,7 @@ procura arbitragens e apostas de valor, notifica sempre, e executa
 import time
 
 import config
-from app.arbitrage import detetar_arbitragem, detetar_valor
+from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.executor import executar_aposta
 from app.notifier import enviar_alerta
 from app.odds import buscar_odds
@@ -13,6 +13,7 @@ from app.odds import buscar_odds
 
 def verificar_uma_vez(desporto: str) -> dict:
     eventos = buscar_odds(desporto)
+    eventos = [filtrar_bookmakers(e, config.BOOKMAKERS_FIAVEIS) for e in eventos]
     resumo = {"arbitragens": 0, "valores": 0}
 
     for evento in eventos:
@@ -28,7 +29,8 @@ def verificar_uma_vez(desporto: str) -> dict:
             for m in arb.melhores_odds:
                 executar_aposta(m.bookmaker, m.resultado, m.odd, stakes[m.resultado])
 
-        for oportunidade in detetar_valor(evento, margem_minima=config.MARGEM_MINIMA_VALOR):
+        odd_maxima = config.ODD_MAXIMA_VALOR if config.ODD_MAXIMA_VALOR > 0 else None
+        for oportunidade in detetar_valor(evento, margem_minima=config.MARGEM_MINIMA_VALOR, odd_maxima=odd_maxima):
             resumo["valores"] += 1
             enviar_alerta(
                 f"📈 VALOR {oportunidade.valor * 100:.1f}% — {' vs '.join(oportunidade.equipas)}: "

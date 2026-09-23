@@ -2,15 +2,19 @@
 import argparse
 
 import config
-from app.arbitrage import detetar_arbitragem, detetar_valor
+from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.live import correr_loop
 from app.odds import buscar_odds, carregar_json
 
 
 def _carregar_eventos(args):
     if args.json:
-        return carregar_json(args.json)
-    return buscar_odds(args.desporto or config.DESPORTOS[0])
+        eventos = carregar_json(args.json)
+    else:
+        eventos = buscar_odds(args.desporto or config.DESPORTOS[0])
+
+    bookmakers = args.bookmakers.split(",") if getattr(args, "bookmakers", None) else config.BOOKMAKERS_FIAVEIS
+    return [filtrar_bookmakers(e, bookmakers) for e in eventos]
 
 
 def cmd_arbitragem(args):
@@ -39,16 +43,18 @@ def cmd_arbitragem(args):
 
 def cmd_valor(args):
     eventos = _carregar_eventos(args)
+    odd_maxima = args.odd_maxima if args.odd_maxima and args.odd_maxima > 0 else None
     total = 0
     for evento in eventos:
-        for o in detetar_valor(evento, margem_minima=args.margem_minima):
+        for o in detetar_valor(evento, margem_minima=args.margem_minima, odd_maxima=odd_maxima):
             total += 1
             print(
                 f"{' vs '.join(o.equipas)}: {o.resultado} @ {o.odd} ({o.bookmaker}) "
                 f"— valor {o.valor * 100:.1f}% (prob. justa {o.probabilidade_justa * 100:.1f}%)"
             )
 
-    print(f"\n{total} aposta(s) de valor encontrada(s) em {len(eventos)} evento(s).")
+    print(f"\n{total} aposta(s) de valor encontrada(s) em {len(eventos)} evento(s)"
+          f"{f' (odds até {odd_maxima})' if odd_maxima else ''}.")
     print(
         "\n⚠️ 'Valor' aqui é uma heurística (desvio face ao consenso do "
         "mercado após remover o overround de cada casa), não uma previsão "
@@ -67,6 +73,10 @@ def main():
     def _args_comuns(p):
         p.add_argument("--json", help="ficheiro JSON local com eventos (evita precisar de ODDS_API_KEY)")
         p.add_argument("--desporto", help="chave do desporto na The Odds API, ex: soccer_epl (omissão: 1º em DESPORTOS)")
+        p.add_argument(
+            "--bookmakers",
+            help="lista de bookmakers a considerar, separados por vírgula (omissão: BOOKMAKERS_FIAVEIS no .env, vazio = todas)",
+        )
 
     p_arb = subparsers.add_parser("arbitragem", help="procura arbitragens (surebets) entre bookmakers")
     _args_comuns(p_arb)
@@ -77,6 +87,12 @@ def main():
     p_valor = subparsers.add_parser("valor", help="procura apostas de valor (odd acima da probabilidade justa estimada)")
     _args_comuns(p_valor)
     p_valor.add_argument("--margem-minima", type=float, default=config.MARGEM_MINIMA_VALOR)
+    p_valor.add_argument(
+        "--odd-maxima",
+        type=float,
+        default=config.ODD_MAXIMA_VALOR,
+        help="ignora odds acima disto — reduz falsos positivos em azarões (omissão: ODD_MAXIMA_VALOR no .env, 4.0). Usa 0 para desativar.",
+    )
     p_valor.set_defaults(func=cmd_valor)
 
     p_live = subparsers.add_parser("live", help="corre o bot continuamente (alertas e/ou execução na Betfair)")

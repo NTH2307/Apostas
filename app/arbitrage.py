@@ -39,6 +39,25 @@ class OportunidadeValor:
     valor: float  # (odd * probabilidade_justa) - 1 -> edge estimado
 
 
+def filtrar_bookmakers(evento: dict, permitidos: list) -> dict:
+    """Devolve uma cópia do evento só com os bookmakers cujo nome (sem
+    distinguir maiúsculas/minúsculas) está em `permitidos`. Lista vazia ou
+    None = sem filtro (mantém todos os bookmakers).
+
+    Útil para excluir casas pouco fiáveis ou não licenciadas na tua
+    jurisdição do cálculo — tanto do consenso de "probabilidade justa" como
+    das odds consideradas para arbitragem/valor.
+    """
+    if not permitidos:
+        return evento
+    permitidos_norm = {p.strip().lower() for p in permitidos}
+    bookmakers_filtrados = {
+        nome: odds for nome, odds in evento["bookmakers"].items()
+        if nome.strip().lower() in permitidos_norm
+    }
+    return {**evento, "bookmakers": bookmakers_filtrados}
+
+
 def melhores_odds_por_resultado(evento: dict) -> list[MelhorOdd]:
     """Para cada resultado possível, encontra a melhor odd disponível entre
     todos os bookmakers do evento."""
@@ -83,7 +102,7 @@ def detetar_arbitragem(evento: dict, margem_minima: float = 0.0) -> Oportunidade
     )
 
 
-def detetar_valor(evento: dict, margem_minima: float = 0.0) -> list[OportunidadeValor]:
+def detetar_valor(evento: dict, margem_minima: float = 0.0, odd_maxima: float | None = None) -> list[OportunidadeValor]:
     """Estima a probabilidade "justa" de cada resultado removendo o overround
     médio do mercado (consenso entre bookmakers), e assinala quando a odd de
     um bookmaker específico paga acima dessa probabilidade justa.
@@ -94,6 +113,13 @@ def detetar_valor(evento: dict, margem_minima: float = 0.0) -> list[Oportunidade
     apostadores, por isso "valor" aqui só significa que uma casa está, neste
     momento, a pagar mais do que as outras acham justo — não que a aposta
     vai ganhar.
+
+    ⚠️ Em odds muito altas (azarões), um pequeno erro absoluto na odd de uma
+    única bookmaker vira um "valor" percentual enorme, e entra em jogo o
+    "favorite-longshot bias" (as casas tendem a pagar ligeiramente a mais em
+    azarões de propósito, sem que isso signifique lucro real a longo prazo).
+    Usa `odd_maxima` para ignorar odds acima desse valor — ver
+    `config.ODD_MAXIMA_VALOR`.
     """
     probabilidades_justas = probabilidades_implicitas_justas(evento)
     if not probabilidades_justas:
@@ -102,6 +128,8 @@ def detetar_valor(evento: dict, margem_minima: float = 0.0) -> list[Oportunidade
     oportunidades = []
     for bookmaker, odds in evento["bookmakers"].items():
         for resultado, odd in odds.items():
+            if odd_maxima is not None and odd > odd_maxima:
+                continue
             prob_justa = probabilidades_justas.get(resultado)
             if not prob_justa:
                 continue

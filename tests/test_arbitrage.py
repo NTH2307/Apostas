@@ -1,6 +1,7 @@
 from app.arbitrage import (
     detetar_arbitragem,
     detetar_valor,
+    filtrar_bookmakers,
     melhores_odds_por_resultado,
     probabilidades_implicitas_justas,
 )
@@ -102,3 +103,47 @@ def test_nao_deteta_valor_em_mercado_consistente():
         "Casa Z": {"A": 1.95, "B": 1.95},
     })
     assert detetar_valor(evento, margem_minima=0.01) == []
+
+
+def test_odd_maxima_filtra_azaroes_com_odds_muito_altas():
+    # Casa Z destoa muito para cima em "B" (azarão, odd muito alta) — sem
+    # limite seria "valor"; com odd_maxima baixo deve ser ignorado
+    evento = _evento({
+        "Casa X": {"A": 1.50, "B": 2.60},
+        "Casa Y": {"A": 1.55, "B": 2.50},
+        "Casa Z": {"A": 1.53, "B": 9.00},
+    })
+    sem_limite = detetar_valor(evento, margem_minima=0.05)
+    assert any(o.bookmaker == "Casa Z" and o.resultado == "B" for o in sem_limite)
+
+    com_limite = detetar_valor(evento, margem_minima=0.05, odd_maxima=4.0)
+    assert not any(o.odd > 4.0 for o in com_limite)
+    assert not any(o.bookmaker == "Casa Z" and o.resultado == "B" for o in com_limite)
+
+
+def test_filtrar_bookmakers_sem_lista_devolve_evento_igual():
+    evento = _evento({"Casa X": {"A": 1.90, "B": 2.00}})
+    assert filtrar_bookmakers(evento, []) == evento
+    assert filtrar_bookmakers(evento, None) == evento
+
+
+def test_filtrar_bookmakers_mantem_so_as_permitidas_ignorando_maiusculas():
+    evento = _evento({
+        "Casa X": {"A": 1.90, "B": 2.00},
+        "Casa Y": {"A": 2.10, "B": 1.85},
+        "Casa Z": {"A": 1.95, "B": 1.95},
+    })
+    filtrado = filtrar_bookmakers(evento, ["casa x", "Casa Z"])
+    assert set(filtrado["bookmakers"].keys()) == {"Casa X", "Casa Z"}
+
+
+def test_filtrar_bookmakers_afeta_deteccao_de_arbitragem():
+    # arbitragem só existe combinando Casa X e Casa Y; excluindo Casa Y não
+    # deve haver arbitragem
+    evento = _evento({
+        "Casa X": {"A": 1.90, "B": 2.05},
+        "Casa Y": {"A": 2.10, "B": 1.85},
+    })
+    assert detetar_arbitragem(evento) is not None
+    filtrado = filtrar_bookmakers(evento, ["Casa X"])
+    assert detetar_arbitragem(filtrado) is None

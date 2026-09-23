@@ -94,6 +94,22 @@ python main.py valor --desporto tennis_atp --margem-minima 0.05
 Lista de chaves de desporto disponíveis:
 [the-odds-api.com/sports-odds-data/sports-apis.html](https://the-odds-api.com/sports-odds-data/sports-apis.html).
 
+### Reduzir falsos positivos (odds altas e bookmakers pouco fiáveis)
+
+Em odds muito altas (azarões), um pequeno erro numa única bookmaker cria um
+"valor" percentual desproporcionado, e há um efeito real bem documentado —
+o **"favorite-longshot bias"**: as casas tendem a pagar ligeiramente a mais
+em azarões de propósito, o que parece valor mas historicamente não se
+traduz em lucro. Dois filtros ajudam a reduzir isto:
+
+```bash
+# só considera odds até 4.0, e só estas bookmakers
+python main.py valor --desporto soccer_epl --odd-maxima 4.0 --bookmakers "Betfair,Betano,Bwin"
+```
+
+- `--odd-maxima` (ou `ODD_MAXIMA_VALOR` no `.env`, omissão 4.0, `0` desativa): ignora odds acima deste valor na deteção de **valor** (a arbitragem não é afetada — a garantia matemática dela não depende da magnitude da odd).
+- `--bookmakers` (ou `BOOKMAKERS_FIAVEIS` no `.env`, separados por vírgula, vazio = todas): restringe o cálculo — tanto o consenso de probabilidade "justa" como as odds candidatas — só a estas casas. Usa nomes exatamente como a The Odds API os devolve (aparecem no output do bot); serve para excluir casas não licenciadas na tua jurisdição ou de fiabilidade duvidosa.
+
 ## Modo live (alertas e/ou execução automática)
 
 ```bash
