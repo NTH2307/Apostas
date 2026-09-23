@@ -90,19 +90,18 @@ def cmd_desportos(args):
         print(f"{d['key']:40s} {d.get('title', '')}{estado}")
 
 
-def cmd_modelo(args):
-    try:
-        jogos = buscar_jogos_terminados(args.competicao, limite=args.jogos_historico)
-    except Exception as e:
-        print(f"Erro a obter estatísticas para '{args.competicao}': {e}")
-        return
+def _correr_modelo_competicao(competicao: str, desporto: str, args) -> dict:
+    """Corre o modelo para UM par competição (football-data.org)/desporto
+    (The Odds API), imprime os resultados, e devolve as contagens para
+    somares ao total quando corres várias competições (--todas)."""
+    jogos = buscar_jogos_terminados(competicao, limite=args.jogos_historico)
     forcas = calcular_forcas(jogos)
     if not forcas["equipas"]:
-        print(f"Sem jogos terminados suficientes para '{args.competicao}' — não dá para calcular o modelo.")
-        return
-    print(f"Modelo calculado a partir de {len(jogos)} jogos terminados de '{args.competicao}'.")
+        print(f"\n=== {competicao} ({desporto}) === sem jogos terminados suficientes — a saltar.")
+        return {"discrepancias": 0, "jogos": 0, "sem_dados": 0}
+    print(f"\n=== {competicao} ({desporto}) — modelo a partir de {len(jogos)} jogos terminados ===")
 
-    eventos = buscar_odds(args.desporto)
+    eventos = buscar_odds(desporto)
     dia = date.fromisoformat(args.dia) if getattr(args, "dia", None) else (amanha() if getattr(args, "amanha", False) else None)
     if dia:
         eventos = filtrar_por_dia(eventos, dia)
@@ -117,7 +116,7 @@ def cmd_modelo(args):
         fora_equiv = encontrar_nome_equivalente(fora_nome, forcas["equipas"])
         if not casa_equiv or not fora_equiv:
             print(f"\n{casa_nome} vs {fora_nome}: sem dados suficientes no modelo "
-                  f"(equipa não encontrada nas estatísticas de '{args.competicao}').")
+                  f"(equipa não encontrada nas estatísticas de '{competicao}').")
             sem_dados += 1
             continue
 
@@ -142,9 +141,37 @@ def cmd_modelo(args):
                 f"— modelo dá {o.probabilidade_modelo * 100:.0f}% (valor {o.valor * 100:.1f}%)"
             )
 
+    return {"discrepancias": discrepancias, "jogos": len(eventos) - sem_dados, "sem_dados": sem_dados}
+
+
+def cmd_modelo(args):
+    if args.todas:
+        pares = config.COMPETICOES_MODELO
+    elif args.competicao and args.desporto:
+        pares = [(args.competicao, args.desporto)]
+    else:
+        print("Precisas de --competicao e --desporto, ou usa --todas para correr em todas as ligas de COMPETICOES_MODELO (.env).")
+        return
+
+    total = {"discrepancias": 0, "jogos": 0, "sem_dados": 0}
+    falhas = []
+    for competicao, desporto in pares:
+        try:
+            resultado = _correr_modelo_competicao(competicao, desporto, args)
+        except Exception as e:
+            falhas.append(f"{competicao}: {e}")
+            print(f"\n=== {competicao} ({desporto}) === erro: {e}")
+            continue
+        total["discrepancias"] += resultado["discrepancias"]
+        total["jogos"] += resultado["jogos"]
+        total["sem_dados"] += resultado["sem_dados"]
+
     print(
-        f"\n{discrepancias} discrepância(s) modelo-vs-mercado (1X2) em "
-        f"{len(eventos) - sem_dados} jogo(s) analisados ({sem_dados} sem dados suficientes no modelo)."
+        f"\n{total['discrepancias']} discrepância(s) modelo-vs-mercado (1X2) em "
+        f"{total['jogos']} jogo(s) analisados em {len(pares)} competição(ões) "
+        f"({total['sem_dados']} sem dados suficientes no modelo"
+        + (f", {len(falhas)} competição(ões) falharam: {'; '.join(falhas)}" if falhas else "")
+        + ")."
     )
     print(
         "\n⚠️ Isto é uma segunda opinião estatística (modelo de Poisson a partir de golos "
@@ -210,8 +237,13 @@ def main():
         "modelo",
         help="calcula um modelo estatístico próprio (golos marcados/sofridos, football-data.org) e compara com as odds de mercado",
     )
-    p_modelo.add_argument("--competicao", required=True, help="código da competição na football-data.org, ex: PL, PD, SA, BL1, FL1, PPL, CL")
-    p_modelo.add_argument("--desporto", required=True, help="chave da MESMA competição na The Odds API, ex: soccer_epl")
+    p_modelo.add_argument("--competicao", help="código da competição na football-data.org, ex: PL, PD, SA, BL1, FL1, PPL, CL (omite se usares --todas)")
+    p_modelo.add_argument("--desporto", help="chave da MESMA competição na The Odds API, ex: soccer_epl (omite se usares --todas)")
+    p_modelo.add_argument(
+        "--todas",
+        action="store_true",
+        help="corre o modelo em todas as ligas de COMPETICOES_MODELO (.env) de uma vez, em vez de uma competição só (só futebol — o modelo de Poisson não serve para basquetebol)",
+    )
     p_modelo.add_argument(
         "--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO,
         help="quantos jogos terminados usar para calcular as forças (omissão: MODELO_JOGOS_HISTORICO no .env, 200)",

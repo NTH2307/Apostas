@@ -36,6 +36,18 @@ FOOTBALL_DATA_BASE_URL = os.getenv("FOOTBALL_DATA_BASE_URL", "https://api.footba
 MODELO_JOGOS_HISTORICO = int(os.getenv("MODELO_JOGOS_HISTORICO", 200))  # jogos terminados usados para calcular forças
 MODELO_MARGEM_MINIMA = float(os.getenv("MODELO_MARGEM_MINIMA", 0.05))   # mais exigente que o valor de mercado — o modelo também pode estar errado
 
+# Pares "código football-data.org:chave The Odds API" para `modelo --todas`
+# (as principais ligas europeias de futebol — o modelo de Poisson só serve
+# para futebol, não basquetebol). Edita à vontade; separa pares por vírgula.
+COMPETICOES_MODELO = [
+    tuple(par.split(":")) for par in os.getenv(
+        "COMPETICOES_MODELO",
+        "PL:soccer_epl,PD:soccer_spain_la_liga,SA:soccer_italy_serie_a,"
+        "BL1:soccer_germany_bundesliga,FL1:soccer_france_ligue_one,"
+        "PPL:soccer_portugal_primeira_liga,CL:soccer_uefa_champs_league",
+    ).split(",") if par.strip()
+]
+
 # --- Gestão de risco ⚠️ revê sempre antes de arriscar dinheiro real ---
 CAPITAL_INICIAL = float(os.getenv("CAPITAL_INICIAL", 100))     # unidades monetárias (ex: EUR)
 STAKE_MAXIMA_POR_APOSTA = float(os.getenv("STAKE_MAXIMA_POR_APOSTA", 10))

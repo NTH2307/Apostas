@@ -66,3 +66,78 @@ def test_resolver_desportos_sem_argumento_usa_config(monkeypatch):
     monkeypatch.setattr(config, "DESPORTOS", ["soccer_portugal_primeira_liga"])
     args = argparse.Namespace(desporto=None)
     assert main._resolver_desportos(args) == ["soccer_portugal_primeira_liga"]
+
+
+def _evento_modelo(desporto, casa, fora):
+    return {
+        "id": f"{casa}-{fora}", "desporto": desporto, "hora_inicio": "", "equipas": [casa, fora],
+        "bookmakers": {"Casa X": {casa: 1.9, "Draw": 3.4, fora: 4.0}},
+    }
+
+
+def test_cmd_modelo_sem_competicao_nem_todas_avisa_e_nao_rebenta(capsys):
+    args = argparse.Namespace(competicao=None, desporto=None, todas=False)
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "--todas" in saida
+
+
+def test_cmd_modelo_uma_competicao(monkeypatch, capsys):
+    jogos = [{"casa": "Time A", "fora": "Time B", "golos_casa": 2, "golos_fora": 0}]
+    monkeypatch.setattr(main, "buscar_jogos_terminados", lambda competicao, limite: jogos)
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: [_evento_modelo(desporto, "Time A", "Time B")])
+
+    args = argparse.Namespace(
+        competicao="TESTE", desporto="soccer_teste", todas=False, jogos_historico=200,
+        margem_minima=0.05, bookmakers=None, amanha=False, dia=None,
+    )
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "Time A vs Time B" in saida
+    assert "1 jogo(s) analisados em 1 competição" in saida
+
+
+def test_cmd_modelo_todas_soma_varias_competicoes(monkeypatch, capsys):
+    import config
+    monkeypatch.setattr(config, "COMPETICOES_MODELO", [("C1", "soccer_c1"), ("C2", "soccer_c2")])
+
+    jogos_por_competicao = {
+        "C1": [{"casa": "A", "fora": "B", "golos_casa": 1, "golos_fora": 0}],
+        "C2": [{"casa": "C", "fora": "D", "golos_casa": 1, "golos_fora": 0}],
+    }
+    monkeypatch.setattr(main, "buscar_jogos_terminados", lambda competicao, limite: jogos_por_competicao[competicao])
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: [
+        _evento_modelo(desporto, *({"soccer_c1": ("A", "B"), "soccer_c2": ("C", "D")}[desporto]))
+    ])
+
+    args = argparse.Namespace(
+        competicao=None, desporto=None, todas=True, jogos_historico=200,
+        margem_minima=0.05, bookmakers=None, amanha=False, dia=None,
+    )
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "=== C1" in saida
+    assert "=== C2" in saida
+    assert "em 2 competição(ões)" in saida
+
+
+def test_cmd_modelo_todas_uma_competicao_falha_nao_para_as_outras(monkeypatch, capsys):
+    import config
+    monkeypatch.setattr(config, "COMPETICOES_MODELO", [("QUEBRADA", "soccer_x"), ("C2", "soccer_c2")])
+
+    def _buscar_jogos(competicao, limite):
+        if competicao == "QUEBRADA":
+            raise RuntimeError("404 not found")
+        return [{"casa": "C", "fora": "D", "golos_casa": 1, "golos_fora": 0}]
+
+    monkeypatch.setattr(main, "buscar_jogos_terminados", _buscar_jogos)
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: [_evento_modelo(desporto, "C", "D")])
+
+    args = argparse.Namespace(
+        competicao=None, desporto=None, todas=True, jogos_historico=200,
+        margem_minima=0.05, bookmakers=None, amanha=False, dia=None,
+    )
+    main.cmd_modelo(args)
+    saida = capsys.readouterr().out
+    assert "QUEBRADA" in saida
+    assert "=== C2" in saida

@@ -172,6 +172,22 @@ python main.py modelo --competicao PL --desporto soccer_epl --amanha
 - Precisa de `FOOTBALL_DATA_API_KEY` no `.env` — cria uma chave grátis em
   [football-data.org/client/register](https://www.football-data.org/client/register).
 
+### Todas as ligas principais de uma vez
+
+Em vez de correres liga a liga, `--todas` corre o modelo em todas as
+competições de `COMPETICOES_MODELO` (.env — por omissão: Premier League,
+La Liga, Serie A, Bundesliga, Ligue 1, Primeira Liga, Champions League):
+
+```bash
+python main.py modelo --todas --amanha
+```
+
+Uma competição que falhe (chave errada, sem jogos suficientes) fica
+registada no resumo final e não trava as restantes. **Isto só cobre
+futebol** — o modelo de Poisson e a football-data.org não servem para
+basquetebol (é um desporto de pontuação muito diferente, precisaria de
+outro modelo e outra fonte de dados).
+
 Para cada jogo mostra sempre: os golos esperados do modelo, a probabilidade
 1X2 do modelo (e o favorito segundo o modelo), e a opinião do modelo sobre
 over/under 2.5 golos e ambas marcam (BTTS). Quando o mercado paga mais do
