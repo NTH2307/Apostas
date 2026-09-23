@@ -1,20 +1,39 @@
-"""CLI do BettingBot: `arbitragem`, `valor` ou `live`."""
+"""CLI do BettingBot: `arbitragem`, `valor`, `desportos` ou `live`."""
 import argparse
+from datetime import date
 
 import config
 from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.live import correr_loop
-from app.odds import buscar_odds, carregar_json
+from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos
+
+
+def _resolver_desportos(args) -> list:
+    if args.desporto:
+        return [d.strip() for d in args.desporto.split(",") if d.strip()]
+    return config.DESPORTOS
 
 
 def _carregar_eventos(args):
     if args.json:
         eventos = carregar_json(args.json)
     else:
-        eventos = buscar_odds(args.desporto or config.DESPORTOS[0])
+        eventos = []
+        for desporto in _resolver_desportos(args):
+            eventos.extend(buscar_odds(desporto))
 
     bookmakers = args.bookmakers.split(",") if getattr(args, "bookmakers", None) else config.BOOKMAKERS_FIAVEIS
-    return [filtrar_bookmakers(e, bookmakers) for e in eventos]
+    eventos = [filtrar_bookmakers(e, bookmakers) for e in eventos]
+
+    dia = None
+    if getattr(args, "dia", None):
+        dia = date.fromisoformat(args.dia)
+    elif getattr(args, "amanha", False):
+        dia = amanha()
+    if dia:
+        eventos = filtrar_por_dia(eventos, dia)
+
+    return eventos
 
 
 def cmd_arbitragem(args):
@@ -62,6 +81,12 @@ def cmd_valor(args):
     )
 
 
+def cmd_desportos(args):
+    for d in listar_desportos(args.filtro):
+        estado = "" if d.get("active", True) else "  (inativo)"
+        print(f"{d['key']:40s} {d.get('title', '')}{estado}")
+
+
 def cmd_live(_args):
     correr_loop()
 
@@ -72,11 +97,21 @@ def main():
 
     def _args_comuns(p):
         p.add_argument("--json", help="ficheiro JSON local com eventos (evita precisar de ODDS_API_KEY)")
-        p.add_argument("--desporto", help="chave do desporto na The Odds API, ex: soccer_epl (omissão: 1º em DESPORTOS)")
+        p.add_argument(
+            "--desporto",
+            help="chave(s) de desporto na The Odds API, separadas por vírgula, ex: soccer_epl,basketball_nba "
+                 "(omissão: DESPORTOS no .env). Usa `python main.py desportos` para veres as chaves disponíveis.",
+        )
         p.add_argument(
             "--bookmakers",
             help="lista de bookmakers a considerar, separados por vírgula (omissão: BOOKMAKERS_FIAVEIS no .env, vazio = todas)",
         )
+        p.add_argument(
+            "--amanha",
+            action="store_true",
+            help="só jogos que começam amanhã, hora de Portugal (ignorado se usares --dia)",
+        )
+        p.add_argument("--dia", help="só jogos neste dia, formato AAAA-MM-DD, hora de Portugal")
 
     p_arb = subparsers.add_parser("arbitragem", help="procura arbitragens (surebets) entre bookmakers")
     _args_comuns(p_arb)
@@ -94,6 +129,10 @@ def main():
         help="ignora odds acima disto — reduz falsos positivos em azarões (omissão: ODD_MAXIMA_VALOR no .env, 4.0). Usa 0 para desativar.",
     )
     p_valor.set_defaults(func=cmd_valor)
+
+    p_desportos = subparsers.add_parser("desportos", help="lista as chaves de desporto/competição disponíveis na The Odds API")
+    p_desportos.add_argument("--filtro", help="texto a procurar na chave/título/descrição, ex: 'nations' ou 'portugal'")
+    p_desportos.set_defaults(func=cmd_desportos)
 
     p_live = subparsers.add_parser("live", help="corre o bot continuamente (alertas e/ou execução na Betfair)")
     p_live.set_defaults(func=cmd_live)

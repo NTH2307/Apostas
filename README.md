@@ -91,8 +91,39 @@ python main.py arbitragem --desporto soccer_epl
 python main.py valor --desporto tennis_atp --margem-minima 0.05
 ```
 
-Lista de chaves de desporto disponíveis:
-[the-odds-api.com/sports-odds-data/sports-apis.html](https://the-odds-api.com/sports-odds-data/sports-apis.html).
+`--desporto` aceita várias chaves separadas por vírgula, para juntares
+desportos diferentes numa só verificação — ex: só futebol e basquetebol:
+
+```bash
+python main.py valor --desporto soccer_epl,basketball_nba
+```
+
+### Encontrar a chave certa (ex: Liga das Nações, Liga Portugal)
+
+A The Odds API tem uma chave por competição (não uma chave genérica
+"futebol"). Para veres as disponíveis sem teres de consultar a
+documentação:
+
+```bash
+python main.py desportos --filtro nations     # ex: soccer_uefa_nations_league
+python main.py desportos --filtro portugal    # ex: soccer_portugal_primeira_liga
+python main.py desportos                      # lista tudo
+```
+
+(lista completa também em
+[the-odds-api.com/sports-odds-data/sports-apis.html](https://the-odds-api.com/sports-odds-data/sports-apis.html))
+
+### Só jogos de um dia específico (ex: "amanhã")
+
+```bash
+python main.py valor --desporto soccer_epl --amanha
+python main.py valor --desporto soccer_epl --dia 2026-09-28
+```
+
+Compara a hora de início de cada evento (que a API devolve em UTC) com o
+dia indicado **na hora de Portugal** (`Europe/Lisbon`) — por isso um jogo às
+23:30 UTC pode já contar como do dia seguinte, tal como aparece no teu
+telemóvel.
 
 ### Reduzir falsos positivos (odds altas e bookmakers pouco fiáveis)
 

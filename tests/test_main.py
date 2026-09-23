@@ -47,3 +47,22 @@ def test_cmd_arbitragem_com_filtro_de_bookmakers_via_cli(capsys):
     saida = capsys.readouterr().out
     # com só uma bookmaker por evento não há arbitragem possível
     assert "0 arbitragem(ns)" in saida
+
+
+def test_carregar_eventos_filtra_por_dia():
+    # os 3 eventos do exemplo: 2 em 2026-09-27 (hora de Portugal) e 1 em 2026-09-28
+    args = argparse.Namespace(json=_caminho_exemplo(), desporto=None, bookmakers=None, dia="2026-09-27", amanha=False)
+    eventos = main._carregar_eventos(args)
+    assert len(eventos) == 2
+
+
+def test_resolver_desportos_aceita_lista_separada_por_virgulas():
+    args = argparse.Namespace(desporto="soccer_epl, basketball_nba")
+    assert main._resolver_desportos(args) == ["soccer_epl", "basketball_nba"]
+
+
+def test_resolver_desportos_sem_argumento_usa_config(monkeypatch):
+    import config
+    monkeypatch.setattr(config, "DESPORTOS", ["soccer_portugal_primeira_liga"])
+    args = argparse.Namespace(desporto=None)
+    assert main._resolver_desportos(args) == ["soccer_portugal_primeira_liga"]
