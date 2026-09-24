@@ -38,6 +38,10 @@ MODELO_MARGEM_MINIMA = float(os.getenv("MODELO_MARGEM_MINIMA", 0.05))   # mais e
 # "Jogos fictícios" de equipa média somados a cada equipa ao calcular forças
 # — impede que 1-2 jogos atípicos deem forças extremas (ex: 0 golos esperados).
 MODELO_PESO_PRIOR = float(os.getenv("MODELO_PESO_PRIOR", 5))
+# Um jogo com esta antiguidade (em dias) pesa metade de um jogo de hoje —
+# dá mais peso à forma recente do que à média da época toda. 0 desativa
+# (todos os jogos pesam igual).
+MODELO_MEIA_VIDA_DIAS = float(os.getenv("MODELO_MEIA_VIDA_DIAS", 60))
 
 # --- Sugestões de aposta (comando `apostas`, ver app/recomendacao.py) ---
 # Peso do modelo vs. consenso do mercado na probabilidade final do 1X2 (0 =
@@ -52,6 +56,17 @@ APOSTAS_VALOR_SUSPEITO = float(os.getenv("APOSTAS_VALOR_SUSPEITO", 0.20))   # ac
 APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # confiança mínima para sugerir um mercado de golos
 APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 7))                            # janela de dias a analisar por omissão
 RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))
+
+# --- Lesões de jogadores (informativo, ver app/lesoes.py — comando `apostas --lesoes`) ---
+# API-Football / api-sports.io, free tier: 100 pedidos/dia. Cria conta em
+# https://dashboard.api-football.com/register (o "API-Football" direto,
+# não precisa de passar pela RapidAPI).
+# ⚠️ Isto é só informativo — o modelo NÃO ajusta probabilidades com base em
+# lesões, é apresentado no relatório para tu decidires. Desligado por
+# omissão (precisa de --lesoes explícito, para não gastares a cota sem querer).
+API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
+API_FOOTBALL_BASE_URL = os.getenv("API_FOOTBALL_BASE_URL", "https://v3.football.api-sports.io")
+LESOES_DIAS_RECENTES = int(os.getenv("LESOES_DIAS_RECENTES", 30))  # só mostra lesões reportadas nos últimos X dias
 
 # Pares "código football-data.org:chave The Odds API" para `modelo --todas`
 # — todas as competições de futebol de clubes cobertas pelo free tier da

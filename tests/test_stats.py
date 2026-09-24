@@ -68,6 +68,40 @@ def test_encolhimento_quase_nao_mexe_com_muitos_jogos():
     assert encolhido == pytest.approx(bruto, rel=0.1)
 
 
+def test_forma_recente_pesa_mais_do_que_jogos_antigos():
+    # A jogou mal no jogo recente, bem no antigo -> com decaimento, a forma
+    # recente (má) deve dominar a força calculada. C dá um ponto de
+    # referência da liga independente de A (senão a média da liga seria
+    # só a própria média de A, e a razão daria sempre 1.0).
+    jogos = [
+        {"casa": "A", "fora": "X", "golos_casa": 0, "golos_fora": 3, "data": "2026-09-20T15:00:00Z"},
+        {"casa": "A", "fora": "Y", "golos_casa": 5, "golos_fora": 0, "data": "2025-01-01T15:00:00Z"},
+        {"casa": "C", "fora": "D", "golos_casa": 2, "golos_fora": 1, "data": "2026-09-15T15:00:00Z"},
+    ]
+    com_decaimento = calcular_forcas(jogos, peso_prior=0, meia_vida_dias=30)
+    sem_decaimento = calcular_forcas(jogos, peso_prior=0, meia_vida_dias=0)
+    assert com_decaimento["equipas"]["A"]["ataque_casa"] < sem_decaimento["equipas"]["A"]["ataque_casa"]
+
+
+def test_sem_data_nos_jogos_decaimento_nao_faz_diferenca():
+    jogos = [
+        {"casa": "A", "fora": "B", "golos_casa": 2, "golos_fora": 0},
+        {"casa": "B", "fora": "A", "golos_casa": 0, "golos_fora": 2},
+    ]
+    com = calcular_forcas(jogos, peso_prior=0, meia_vida_dias=30)
+    sem = calcular_forcas(jogos, peso_prior=0, meia_vida_dias=0)
+    assert com["equipas"]["A"]["ataque_casa"] == sem["equipas"]["A"]["ataque_casa"]
+
+
+def test_jogos_da_mesma_antiguidade_pesam_igual():
+    jogos = [
+        {"casa": "A", "fora": "B", "golos_casa": 3, "golos_fora": 0, "data": "2026-09-01T15:00:00Z"},
+        {"casa": "B", "fora": "A", "golos_casa": 0, "golos_fora": 1, "data": "2026-08-15T15:00:00Z"},
+    ]
+    forcas = calcular_forcas(jogos, peso_prior=0, meia_vida_dias=30)
+    assert forcas["equipas"]["A"]["jogos"] == 2
+
+
 def test_calcular_forcas_equipa_so_com_jogos_em_casa_fica_neutra_fora():
     jogos = [
         {"casa": "A", "fora": "B", "golos_casa": 2, "golos_fora": 0},

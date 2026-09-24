@@ -65,6 +65,8 @@ class AnaliseJogo:
     sugestao: Sugestao
     alternativas: list = field(default_factory=list)
     avisos: list = field(default_factory=list)
+    lesoes_casa: list = field(default_factory=list)  # preenchido por app/analise.py se --lesoes; nunca usado no cálculo
+    lesoes_fora: list = field(default_factory=list)
 
 
 def confianca_por_amostra(jogos_min: int) -> str:

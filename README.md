@@ -30,9 +30,10 @@ Opções úteis:
 python main.py apostas --amanha                       # só amanhã
 python main.py apostas --dia 2026-10-04                # só um dia específico
 python main.py apostas --competicao PL --desporto soccer_epl  # só uma liga
-python main.py apostas --bookmakers "Betfair,Betano,Bwin"     # restringe casas
+python main.py apostas --bookmakers "Betfair,Pinnacle"  # restringe casas (usa `bookmakers` para veres nomes exatos)
 python main.py apostas --capital 50                    # a tua banca, para calcular stakes
 python main.py apostas --sem-browser                   # não abre o browser sozinho
+python main.py apostas --lesoes                        # mostra lesões recentes por equipa (ver secção própria)
 ```
 
 ## ⚠️ Importante — lê isto antes de arriscar dinheiro real
@@ -77,10 +78,16 @@ python main.py apostas --sem-browser                   # não abre o browser soz
 Para cada jogo:
 
 1. Calcula golos esperados com o modelo de Poisson (mesma base do comando
-   `modelo`), mas com as forças de ataque/defesa **"encolhidas" para a
-   média da liga** consoante o número de jogos de cada equipa
-   (`MODELO_PESO_PRIOR`) — uma equipa com só 1-2 jogos não pode parecer
-   "nunca marca" ou "imbatível" só por acaso da amostra.
+   `modelo`), com dois ajustes face à média simples da época:
+   - As forças de ataque/defesa são **"encolhidas" para a média da liga**
+     consoante o número de jogos de cada equipa (`MODELO_PESO_PRIOR`) —
+     uma equipa com só 1-2 jogos não pode parecer "nunca marca" ou
+     "imbatível" só por acaso da amostra.
+   - **Jogos recentes pesam mais do que jogos antigos** (decaimento
+     exponencial, `MODELO_MEIA_VIDA_DIAS` — omissão 60 dias, ou seja um
+     jogo de há 60 dias pesa metade de um de hoje). Uma equipa em má fase
+     atual não fica escondida atrás de bons resultados de há meses (nem
+     o inverso).
 2. Mistura a probabilidade do modelo com a do consenso do mercado
    (`APOSTAS_PESO_MODELO`, omissão 35% modelo / 65% mercado — o mercado
    agrega muita mais informação do que este modelo, por isso pesa mais) e
@@ -100,6 +107,26 @@ A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor
 encontrado, porque valores maiores tendem a vir de amostras piores, não de
 oportunidades melhores.
+
+### Lesões (informativo, `--lesoes`)
+
+```bash
+python main.py apostas --lesoes
+```
+
+Mostra, por jogo, as lesões reportadas recentemente em cada equipa (via
+[API-Football](https://dashboard.api-football.com/register), free tier:
+100 pedidos/dia — precisa de `API_FOOTBALL_KEY` no `.env`). **Isto é só
+informativo — o modelo NÃO ajusta probabilidades com base nisto.** Estimar
+quanto uma lesão específica vale em golos esperados é um problema bem mais
+difícil do que esta ferramenta tenta resolver; a ideia é leres isto antes
+de confiares numa sugestão, não que o bot já tenha "descontado" a lesão.
+
+⚠️ Desligado por omissão (fica ao critério de `--lesoes` para não gastares
+a cota sem querer — cada equipa nova custa 2 pedidos: procurar o ID +
+listar lesões, com cache dentro da mesma execução). Os dados podem não
+estar atualizados ao minuto — confirma sempre no site do clube ou na
+imprensa antes do jogo.
 
 ## Como funciona (por baixo do `apostas`)
 
@@ -199,13 +226,23 @@ o **"favorite-longshot bias"**: as casas tendem a pagar ligeiramente a mais
 em azarões de propósito, o que parece valor mas historicamente não se
 traduz em lucro. Dois filtros ajudam a reduzir isto:
 
+Primeiro confirma os nomes exatos das bookmakers que a API te dá (não
+adivinhes — nem todas as casas licenciadas na tua jurisdição estão
+cobertas, e algumas aparecem com sufixo de país, ex: "Betclic (FR)"):
+
+```bash
+python main.py bookmakers --desporto soccer_epl
+```
+
+Depois usa os nomes que aparecerem:
+
 ```bash
 # só considera odds até 4.0, e só estas bookmakers
-python main.py valor --desporto soccer_epl --odd-maxima 4.0 --bookmakers "Betfair,Betano,Bwin"
+python main.py valor --desporto soccer_epl --odd-maxima 4.0 --bookmakers "Betfair,Pinnacle"
 ```
 
 - `--odd-maxima` (ou `ODD_MAXIMA_VALOR` no `.env`, omissão 4.0, `0` desativa): ignora odds acima deste valor na deteção de **valor** (a arbitragem não é afetada — a garantia matemática dela não depende da magnitude da odd).
-- `--bookmakers` (ou `BOOKMAKERS_FIAVEIS` no `.env`, separados por vírgula, vazio = todas): restringe o cálculo — tanto o consenso de probabilidade "justa" como as odds candidatas — só a estas casas. Usa nomes exatamente como a The Odds API os devolve (aparecem no output do bot); serve para excluir casas não licenciadas na tua jurisdição ou de fiabilidade duvidosa.
+- `--bookmakers` (ou `BOOKMAKERS_FIAVEIS` no `.env`, separados por vírgula, vazio = todas): restringe o cálculo — tanto o consenso de probabilidade "justa" como as odds candidatas — só a estas casas. Usa os nomes exatos que `bookmakers` te devolveu; serve para excluir casas não licenciadas na tua jurisdição ou de fiabilidade duvidosa.
 
 ## Modelo estatístico próprio (golos, "quem ganha")
 
@@ -376,30 +413,32 @@ python -m pytest tests/ -v
 Cobrem a matemática de arbitragem e de valor (deteção, filtragem por
 margem mínima, cálculo de stakes), o Kelly fracionado, o carregamento de
 odds (formato normalizado e formato bruto da The Odds API), o modelo de
-Poisson e o cálculo de forças de ataque/defesa (com e sem encolhimento
-para a média), a correspondência de nomes de equipas entre as duas fontes
-(com casos reais que já falharam), a lógica de sugestões (`apostas`) e as
-regras de quando o executor pode ou não executar uma ordem real. Correm
+Poisson e o cálculo de forças de ataque/defesa (com e sem encolhimento e
+decaimento por recência), a correspondência de nomes de equipas entre as
+duas fontes (com casos reais que já falharam), a lógica de sugestões
+(`apostas`), as lesões (API-Football, com cache e tratamento de erros), e
+as regras de quando o executor pode ou não executar uma ordem real. Correm
 automaticamente em CI (`.github/workflows/bettingbot-tests.yml`) em cada
 push/PR que toque na pasta `bettingbot/`.
 
 ## Estrutura do projeto
 
-- `config.py` — todos os parâmetros (odds, deteção, modelo, sugestões, risco, execução)
-- `app/odds.py` — obtenção de odds (The Odds API ou JSON local), filtros de data
+- `config.py` — todos os parâmetros (odds, deteção, modelo, sugestões, lesões, risco, execução)
+- `app/odds.py` — obtenção de odds (The Odds API ou JSON local), filtros de data, diagnóstico de bookmakers
 - `app/arbitrage.py` — deteção de arbitragem e de apostas de valor
-- `app/stats.py` — estatísticas de golos por equipa (football-data.org)
+- `app/stats.py` — estatísticas de golos por equipa (football-data.org), com decaimento por recência
 - `app/poisson.py` — modelo de Poisson (golos esperados → probabilidades)
 - `app/model.py` — correspondência de nomes de equipas + compara o modelo com as odds
+- `app/lesoes.py` — lesões recentes por equipa (API-Football, só informativo)
 - `app/recomendacao.py` — transforma a análise de um jogo numa sugestão concreta
-- `app/analise.py` — junta estatísticas e odds de uma competição num intervalo de datas
+- `app/analise.py` — junta estatísticas, odds e lesões de uma competição num intervalo de datas
 - `app/relatorio.py` — gera o relatório HTML do comando `apostas`
 - `app/staking.py` — dimensionamento de apostas (Kelly fracionado)
 - `app/notifier.py` — alertas por Telegram
 - `app/betfair_client.py` — cliente da Betfair Exchange (execução real)
 - `app/executor.py` — execução de apostas (paper ou real, só Betfair)
 - `app/live.py` — loop de verificação contínua e resumo diário
-- `main.py` — CLI (`apostas` / `arbitragem` / `valor` / `modelo` / `resumo` / `desportos` / `competicoes` / `live`)
+- `main.py` — CLI (`apostas` / `arbitragem` / `valor` / `modelo` / `resumo` / `desportos` / `competicoes` / `bookmakers` / `live`)
 - `data/exemplo_odds.json` — dados de exemplo para testar sem API key
 - `tests/` — testes automatizados (pytest)
 
@@ -412,8 +451,13 @@ push/PR que toque na pasta `bettingbot/`.
 - "Valor" (comparação entre casas) é uma heurística sobre o consenso do
   mercado. `apostas`/`modelo` (comparação com golos reais) são mais
   parecidos com uma previsão própria, mas continuam a ser um modelo
-  simples (média da época com encolhimento para amostras pequenas, sem
-  lesões/suspensões/contexto) — nada disto garante lucro.
+  simples (golos marcados/sofridos com encolhimento e decaimento por
+  recência — sem suspensões, onzes prováveis nem contexto tático) — nada
+  disto garante lucro.
+- Lesões (`--lesoes`) são só informativas — o modelo não ajusta
+  probabilidades com base nelas — e dependem do free tier da API-Football
+  (100 pedidos/dia); em ligas menos cobertas por essa API pode não
+  encontrar a equipa ou não ter dados.
 - Sem backtesting histórico real: ao contrário de preços de criptomoedas,
   odds históricas com resultados liquidados não estão disponíveis de forma
   simples e gratuita — o bot só analisa odds ao vivo/pré-jogo.
@@ -437,8 +481,9 @@ push/PR que toque na pasta `bettingbot/`.
   completa.
 - Integrar odds reais de over/under e BTTS, para `apostas`/`modelo`
   comparar essas previsões com o mercado (não só o 1X2).
-- Modelo com peso maior para jogos recentes (ex: decaimento exponencial)
-  em vez de média simples da época.
+- Ajustar automaticamente o modelo quando há lesões de jogadores
+  importantes (hoje é só informativo) — precisaria de saber o impacto de
+  cada jogador na força da equipa, um problema bem mais difícil.
 - Registo em base de dados do histórico de sugestões e resultados reais,
   para avaliar a taxa de acerto ao longo do tempo (equivalente ao que o
   `cryptobot` já mostrou: comparar sempre com o resultado de "não fazer

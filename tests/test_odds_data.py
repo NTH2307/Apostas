@@ -1,7 +1,10 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
-from app.odds import _filtrar_desportos, filtrar_por_dia, filtrar_por_intervalo, hora_local, proxima_data_com_jogos
+from app.odds import (
+    _filtrar_desportos, bookmakers_em_eventos, filtrar_por_dia, filtrar_por_intervalo, hora_local,
+    proxima_data_com_jogos,
+)
 
 
 def _evento(id_, hora_inicio):
@@ -55,6 +58,19 @@ def test_filtrar_por_intervalo_mantem_so_o_intervalo_e_jogos_futuros():
     ]
     filtrados = filtrar_por_intervalo(eventos, date(2026, 9, 24), date(2026, 9, 30), agora=agora)
     assert [e["id"] for e in filtrados] == ["dentro"]
+
+
+def test_bookmakers_em_eventos_conta_e_ordena_por_frequencia():
+    eventos = [
+        {"bookmakers": {"Betfair": {}, "Betclic (FR)": {}}},
+        {"bookmakers": {"Betfair": {}}},
+        {"bookmakers": {}},
+    ]
+    assert bookmakers_em_eventos(eventos) == {"Betfair": 2, "Betclic (FR)": 1}
+
+
+def test_bookmakers_em_eventos_sem_eventos_devolve_vazio():
+    assert bookmakers_em_eventos([]) == {}
 
 
 def test_filtrar_desportos_sem_filtro_devolve_tudo():

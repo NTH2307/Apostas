@@ -50,6 +50,18 @@ def buscar_odds(desporto: str, mercado: str | None = None) -> list[dict]:
     return [_normalizar_evento(evento, desporto) for evento in resposta.json()]
 
 
+def bookmakers_em_eventos(eventos: list[dict]) -> dict:
+    """Conta em quantos eventos aparece cada bookmaker — usa isto (via o
+    comando `bookmakers`) para confirmares o nome exato de uma casa (ex:
+    "Betclic" pode aparecer como "Betclic (FR)") antes de a pores em
+    BOOKMAKERS_FIAVEIS, em vez de adivinhar."""
+    contagens: dict = {}
+    for evento in eventos:
+        for nome in evento.get("bookmakers", {}):
+            contagens[nome] = contagens.get(nome, 0) + 1
+    return dict(sorted(contagens.items(), key=lambda item: item[1], reverse=True))
+
+
 def carregar_json(caminho: str) -> list[dict]:
     """Carrega um snapshot de eventos já normalizado (ver `data/exemplo_odds.json`),
     ou no formato bruto da The Odds API (deteta automaticamente pelo campo

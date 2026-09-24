@@ -3,11 +3,13 @@
 principais ligas europeias). Usado para calcular a força de ataque/defesa
 de cada equipa, input do modelo de Poisson (ver app/poisson.py).
 
-⚠️ Isto trata todos os jogos da janela igualmente (não dá mais peso aos
-mais recentes) — é uma média da época, não "forma recente" no sentido
-estrito.
+Cada jogo pesa mais ou menos consoante a antiguidade (decaimento
+exponencial, ver `_pesos_por_recencia`/`MODELO_MEIA_VIDA_DIAS`) — uma
+equipa em má fase recente não fica "escondida" atrás de bons resultados
+de há meses.
 """
 import time
+from datetime import datetime
 
 import requests
 
@@ -111,51 +113,87 @@ def _encolher(total: float, n_jogos: int, media_liga: float, peso_prior: float) 
     return (n_jogos * bruto + peso_prior * 1.0) / (n_jogos + peso_prior)
 
 
-def calcular_forcas(jogos: list[dict], peso_prior: float | None = None) -> dict:
+def _parse_data(data_str: str):
+    if not data_str:
+        return None
+    try:
+        return datetime.fromisoformat(data_str.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _pesos_por_recencia(jogos: list[dict], meia_vida_dias: float) -> list[float]:
+    """Peso de cada jogo por decaimento exponencial: um jogo `meia_vida_dias`
+    mais antigo do que o mais recente da amostra pesa metade. Jogos sem
+    data reconhecível (ou meia_vida_dias<=0) pesam sempre 1.0 (sem decaimento)."""
+    if not meia_vida_dias:
+        return [1.0] * len(jogos)
+    datas = [_parse_data(j.get("data", "")) for j in jogos]
+    referencia = max((d for d in datas if d), default=None)
+    if not referencia:
+        return [1.0] * len(jogos)
+    return [
+        0.5 ** (max((referencia - d).days, 0) / meia_vida_dias) if d else 1.0
+        for d in datas
+    ]
+
+
+def calcular_forcas(jogos: list[dict], peso_prior: float | None = None, meia_vida_dias: float | None = None) -> dict:
     """A partir de jogos terminados, calcula a força de ataque/defesa de
     cada equipa em casa e fora, relativa à média da competição.
 
     Devolve {"media_golos_casa": float, "media_golos_fora": float,
     "equipas": {"<nome>": {"ataque_casa", "defesa_casa", "ataque_fora",
     "defesa_fora", "jogos"}}}. As forças são encolhidas para a média da
-    liga consoante o número de jogos (ver `_encolher`, peso
-    `config.MODELO_PESO_PRIOR`); `peso_prior=0` dá as forças brutas.
+    liga consoante o peso de jogos disponível (ver `_encolher`, peso
+    `config.MODELO_PESO_PRIOR`; `peso_prior=0` dá as forças brutas) e cada
+    jogo pesa mais ou menos consoante a antiguidade (`config.MODELO_MEIA_VIDA_DIAS`;
+    `meia_vida_dias=0` desativa o decaimento). `equipas[x]["jogos"]`
+    continua a ser a contagem real de jogos (não pesada), usada para medir
+    confiança da amostra.
     """
     if peso_prior is None:
         peso_prior = config.MODELO_PESO_PRIOR
+    if meia_vida_dias is None:
+        meia_vida_dias = config.MODELO_MEIA_VIDA_DIAS
     if not jogos:
         return {"media_golos_casa": 0.0, "media_golos_fora": 0.0, "equipas": {}}
 
-    media_golos_casa = sum(j["golos_casa"] for j in jogos) / len(jogos)
-    media_golos_fora = sum(j["golos_fora"] for j in jogos) / len(jogos)
+    pesos = _pesos_por_recencia(jogos, meia_vida_dias)
+    soma_pesos = sum(pesos)
+    media_golos_casa = sum(j["golos_casa"] * p for j, p in zip(jogos, pesos)) / soma_pesos
+    media_golos_fora = sum(j["golos_fora"] * p for j, p in zip(jogos, pesos)) / soma_pesos
 
     marcados_casa: dict = {}
     sofridos_casa: dict = {}
-    jogos_casa: dict = {}
+    peso_casa: dict = {}
+    n_casa: dict = {}
     marcados_fora: dict = {}
     sofridos_fora: dict = {}
-    jogos_fora: dict = {}
+    peso_fora: dict = {}
+    n_fora: dict = {}
 
-    for j in jogos:
+    for j, p in zip(jogos, pesos):
         casa, fora = j["casa"], j["fora"]
-        marcados_casa[casa] = marcados_casa.get(casa, 0) + j["golos_casa"]
-        sofridos_casa[casa] = sofridos_casa.get(casa, 0) + j["golos_fora"]
-        jogos_casa[casa] = jogos_casa.get(casa, 0) + 1
+        marcados_casa[casa] = marcados_casa.get(casa, 0) + j["golos_casa"] * p
+        sofridos_casa[casa] = sofridos_casa.get(casa, 0) + j["golos_fora"] * p
+        peso_casa[casa] = peso_casa.get(casa, 0) + p
+        n_casa[casa] = n_casa.get(casa, 0) + 1
 
-        marcados_fora[fora] = marcados_fora.get(fora, 0) + j["golos_fora"]
-        sofridos_fora[fora] = sofridos_fora.get(fora, 0) + j["golos_casa"]
-        jogos_fora[fora] = jogos_fora.get(fora, 0) + 1
+        marcados_fora[fora] = marcados_fora.get(fora, 0) + j["golos_fora"] * p
+        sofridos_fora[fora] = sofridos_fora.get(fora, 0) + j["golos_casa"] * p
+        peso_fora[fora] = peso_fora.get(fora, 0) + p
+        n_fora[fora] = n_fora.get(fora, 0) + 1
 
     equipas = {}
-    for nome in set(jogos_casa) | set(jogos_fora):
-        n_casa = jogos_casa.get(nome, 0)
-        n_fora = jogos_fora.get(nome, 0)
+    for nome in set(n_casa) | set(n_fora):
+        pc, pf = peso_casa.get(nome, 0), peso_fora.get(nome, 0)
         equipas[nome] = {
-            "ataque_casa": _encolher(marcados_casa.get(nome, 0), n_casa, media_golos_casa, peso_prior),
-            "defesa_casa": _encolher(sofridos_casa.get(nome, 0), n_casa, media_golos_fora, peso_prior),
-            "ataque_fora": _encolher(marcados_fora.get(nome, 0), n_fora, media_golos_fora, peso_prior),
-            "defesa_fora": _encolher(sofridos_fora.get(nome, 0), n_fora, media_golos_casa, peso_prior),
-            "jogos": n_casa + n_fora,
+            "ataque_casa": _encolher(marcados_casa.get(nome, 0), pc, media_golos_casa, peso_prior),
+            "defesa_casa": _encolher(sofridos_casa.get(nome, 0), pc, media_golos_fora, peso_prior),
+            "ataque_fora": _encolher(marcados_fora.get(nome, 0), pf, media_golos_fora, peso_prior),
+            "defesa_fora": _encolher(sofridos_fora.get(nome, 0), pf, media_golos_casa, peso_prior),
+            "jogos": n_casa.get(nome, 0) + n_fora.get(nome, 0),
         }
 
     return {"media_golos_casa": media_golos_casa, "media_golos_fora": media_golos_fora, "equipas": equipas}

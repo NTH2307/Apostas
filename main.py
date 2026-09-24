@@ -13,7 +13,10 @@ from app.live import correr_loop, resumo_diario
 from app.recomendacao import chave_ordenacao
 from app.relatorio import gerar_html
 from app.model import avaliar_evento, encontrar_nome_equivalente
-from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, hoje, listar_desportos, proxima_data_com_jogos
+from app.odds import (
+    amanha, bookmakers_em_eventos, buscar_odds, carregar_json, filtrar_por_dia, hoje,
+    listar_desportos, proxima_data_com_jogos,
+)
 from app.poisson import golos_esperados, probabilidades
 from app.stats import buscar_jogos_terminados, calcular_forcas, listar_competicoes
 
@@ -105,6 +108,20 @@ def cmd_competicoes(args):
     for c in competicoes:
         area = (c.get("area") or {}).get("name", "")
         print(f"{c.get('code', '?'):8s} {c.get('name', ''):40s} {area}")
+
+
+def cmd_bookmakers(args):
+    desportos = _resolver_desportos(args)
+    eventos = []
+    for desporto in desportos:
+        eventos.extend(buscar_odds(desporto))
+    contagens = bookmakers_em_eventos(eventos)
+    if not contagens:
+        print(f"Nenhum bookmaker encontrado em {len(eventos)} evento(s) — tenta outro --desporto ou outra REGIOES no .env.")
+        return
+    print(f"Bookmakers em {len(eventos)} evento(s) de {', '.join(desportos)} (nome exato a usar em --bookmakers/BOOKMAKERS_FIAVEIS):\n")
+    for nome, n in contagens.items():
+        print(f"  {nome:30s} em {n} evento(s)")
 
 
 def _correr_modelo_competicao(competicao: str, desporto: str, args) -> dict:
@@ -249,8 +266,11 @@ def cmd_apostas(args):
     inicio, fim = _intervalo_datas(args)
     bookmakers = args.bookmakers.split(",") if args.bookmakers else None
     print(f"A analisar {len(pares)} competição(ões), jogos de {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}...")
+    if args.lesoes:
+        print("  (--lesoes ligado: um pedido extra à API-Football por equipa nova — cota free tier 100/dia)")
 
     resultados = []
+    cache_lesoes: dict = {}
     for indice, (competicao, desporto) in enumerate(pares):
         if indice > 0:
             time.sleep(7)  # free tier da football-data.org: 10 pedidos/minuto
@@ -258,6 +278,7 @@ def cmd_apostas(args):
             resultado = analisar_competicao(
                 competicao, desporto, inicio, fim, bookmakers=bookmakers,
                 jogos_historico=args.jogos_historico, capital=args.capital,
+                com_lesoes=args.lesoes, cache_lesoes=cache_lesoes,
             )
         except Exception as e:
             print(f"  {competicao}: erro — {e}")
@@ -345,6 +366,16 @@ def main():
     p_competicoes.add_argument("--filtro", help="texto a procurar no nome/código/país, ex: 'nations' ou 'portugal'")
     p_competicoes.set_defaults(func=cmd_competicoes)
 
+    p_bookmakers = subparsers.add_parser(
+        "bookmakers",
+        help="lista os nomes exatos das bookmakers que aparecem nos teus dados (para confirmares antes de pores em --bookmakers/BOOKMAKERS_FIAVEIS)",
+    )
+    p_bookmakers.add_argument(
+        "--desporto",
+        help="chave(s) de desporto na The Odds API, separadas por vírgula (omissão: DESPORTOS no .env)",
+    )
+    p_bookmakers.set_defaults(func=cmd_bookmakers)
+
     p_modelo = subparsers.add_parser(
         "modelo",
         help="calcula um modelo estatístico próprio (golos marcados/sofridos, football-data.org) e compara com as odds de mercado",
@@ -383,6 +414,10 @@ def main():
     p_apostas.add_argument("--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO)
     p_apostas.add_argument("--saida", help="onde gravar o relatório HTML (omissão: RELATORIO_PATH, relatorio_apostas.html)")
     p_apostas.add_argument("--sem-browser", action="store_true", help="não abrir o relatório no browser automaticamente")
+    p_apostas.add_argument(
+        "--lesoes", action="store_true",
+        help="mostra lesões recentes por equipa (API-Football, precisa de API_FOOTBALL_KEY no .env) — só informativo, não muda o cálculo",
+    )
     p_apostas.set_defaults(func=cmd_apostas)
 
     p_resumo = subparsers.add_parser(

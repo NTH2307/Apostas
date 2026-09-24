@@ -75,6 +75,25 @@ def _evento_modelo(desporto, casa, fora):
     }
 
 
+def test_cmd_bookmakers_lista_nomes_exatos(monkeypatch, capsys):
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: [
+        {"bookmakers": {"Betclic (FR)": {}, "Betfair": {}}},
+    ])
+    args = argparse.Namespace(desporto="soccer_epl")
+    main.cmd_bookmakers(args)
+    saida = capsys.readouterr().out
+    assert "Betclic (FR)" in saida
+    assert "Betfair" in saida
+
+
+def test_cmd_bookmakers_sem_resultados_avisa(monkeypatch, capsys):
+    monkeypatch.setattr(main, "buscar_odds", lambda desporto: [])
+    args = argparse.Namespace(desporto="soccer_epl")
+    main.cmd_bookmakers(args)
+    saida = capsys.readouterr().out
+    assert "Nenhum bookmaker" in saida
+
+
 def test_cmd_competicoes_imprime_codigo_nome_e_pais(monkeypatch, capsys):
     monkeypatch.setattr(main, "listar_competicoes", lambda filtro: [
         {"code": "PPL", "name": "Primeira Liga", "area": {"name": "Portugal"}},
