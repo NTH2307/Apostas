@@ -57,16 +57,11 @@ APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # co
 APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 1))                            # janela de dias a analisar por omissão (1 = só hoje)
 RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))
 
-# --- Lesões de jogadores (informativo, ver app/lesoes.py — comando `apostas --lesoes`) ---
-# API-Football / api-sports.io, free tier: 100 pedidos/dia. Cria conta em
-# https://dashboard.api-football.com/register (o "API-Football" direto,
-# não precisa de passar pela RapidAPI).
-# ⚠️ Isto é só informativo — o modelo NÃO ajusta probabilidades com base em
-# lesões, é apresentado no relatório para tu decidires. Desligado por
-# omissão (precisa de --lesoes explícito, para não gastares a cota sem querer).
-API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY", "")
-API_FOOTBALL_BASE_URL = os.getenv("API_FOOTBALL_BASE_URL", "https://v3.football.api-sports.io")
-LESOES_DIAS_RECENTES = int(os.getenv("LESOES_DIAS_RECENTES", 30))  # só mostra lesões reportadas nos últimos X dias
+# Nota sobre lesões: chegámos a integrar a API-Football, mas o free tier
+# dela só dá acesso a épocas de 2022-2024, não à época atual — inútil para
+# lesões de agora. O relatório mostra em vez disso um link de pesquisa
+# manual por equipa (app/recomendacao.py, `link_pesquisa_lesoes`), sem
+# custo nem configuração.
 
 # Pares "código football-data.org:chave The Odds API" para `modelo --todas`
 # — todas as competições de futebol de clubes cobertas pelo free tier da

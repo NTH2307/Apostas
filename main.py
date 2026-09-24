@@ -266,11 +266,8 @@ def cmd_apostas(args):
     inicio, fim = _intervalo_datas(args)
     bookmakers = args.bookmakers.split(",") if args.bookmakers else None
     print(f"A analisar {len(pares)} competição(ões), jogos de {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}...")
-    if args.lesoes:
-        print("  (--lesoes ligado: um pedido extra à API-Football por equipa nova — cota free tier 100/dia)")
 
     resultados = []
-    cache_lesoes: dict = {}
     for indice, (competicao, desporto) in enumerate(pares):
         if indice > 0:
             time.sleep(7)  # free tier da football-data.org: 10 pedidos/minuto
@@ -278,7 +275,6 @@ def cmd_apostas(args):
             resultado = analisar_competicao(
                 competicao, desporto, inicio, fim, bookmakers=bookmakers,
                 jogos_historico=args.jogos_historico, capital=args.capital,
-                com_lesoes=args.lesoes, cache_lesoes=cache_lesoes,
             )
         except Exception as e:
             print(f"  {competicao}: erro — {e}")
@@ -414,10 +410,6 @@ def main():
     p_apostas.add_argument("--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO)
     p_apostas.add_argument("--saida", help="onde gravar o relatório HTML (omissão: RELATORIO_PATH, relatorio_apostas.html)")
     p_apostas.add_argument("--sem-browser", action="store_true", help="não abrir o relatório no browser automaticamente")
-    p_apostas.add_argument(
-        "--lesoes", action="store_true",
-        help="mostra lesões recentes por equipa (API-Football, precisa de API_FOOTBALL_KEY no .env) — só informativo, não muda o cálculo",
-    )
     p_apostas.set_defaults(func=cmd_apostas)
 
     p_resumo = subparsers.add_parser(

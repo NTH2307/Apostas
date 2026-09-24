@@ -18,6 +18,7 @@ vezes; a vantagem, se existir, só aparece ao fim de muitas apostas.
 """
 from dataclasses import dataclass, field
 from datetime import datetime
+from urllib.parse import quote
 
 import config
 from app.arbitrage import melhores_odds_por_resultado, probabilidades_implicitas_justas
@@ -65,8 +66,17 @@ class AnaliseJogo:
     sugestao: Sugestao
     alternativas: list = field(default_factory=list)
     avisos: list = field(default_factory=list)
-    lesoes_casa: list = field(default_factory=list)  # preenchido por app/analise.py se --lesoes; nunca usado no cálculo
-    lesoes_fora: list = field(default_factory=list)
+    link_lesoes_casa: str = ""  # pesquisa manual — sem API de lesões fiável no free tier, ver README
+    link_lesoes_fora: str = ""
+
+
+def link_pesquisa_lesoes(equipa: str) -> str:
+    """Link de pesquisa Google para lesões da equipa — sem custo nem
+    limites, ao contrário de uma API de lesões (o free tier da
+    API-Football, por exemplo, só dá acesso a épocas de 2022-2024, não à
+    época atual — inútil para lesões de agora). Confirma sempre perto da
+    hora do jogo, as notícias mudam."""
+    return f"https://www.google.com/search?q={quote(f'lesões {equipa} hoje')}"
 
 
 def confianca_por_amostra(jogos_min: int) -> str:
@@ -214,6 +224,8 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | 
         sugestao=principal,
         alternativas=alternativas,
         avisos=avisos,
+        link_lesoes_casa=link_pesquisa_lesoes(casa),
+        link_lesoes_fora=link_pesquisa_lesoes(fora),
     )
 
 

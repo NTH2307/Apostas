@@ -25,15 +25,14 @@ relatório diz isso claramente em vez de aparecer vazio sem explicação.
 Por cada jogo com uma sugestão, o relatório mostra: a aposta concreta
 ("Vitória do Arsenal @ 1.78 na Betfair"), a stake sugerida, a confiança
 (alta/média/baixa, consoante quantos jogos há na amostra de cada equipa),
-lesões recentes (com `--lesoes`), e os números todos por trás (para quem
-quiser verificar). Jogos sem sugestão aparecem como "sem aposta
-recomendada" — o bot não força uma opinião quando os dados não dão para
-isso.
+um link de pesquisa para lesões/notícias de cada equipa, e os números
+todos por trás (para quem quiser verificar). Jogos sem sugestão aparecem
+como "sem aposta recomendada" — o bot não força uma opinião quando os
+dados não dão para isso.
 
 Opções úteis:
 
 ```bash
-python main.py apostas --lesoes                        # + lesões recentes por equipa (ver secção própria)
 python main.py apostas --dias 7                        # alarga a janela (omissão: só hoje)
 python main.py apostas --amanha                        # só amanhã
 python main.py apostas --dia 2026-10-04                # só um dia específico
@@ -115,25 +114,20 @@ menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor
 encontrado, porque valores maiores tendem a vir de amostras piores, não de
 oportunidades melhores.
 
-### Lesões (informativo, `--lesoes`)
+### Lesões (link de pesquisa)
 
-```bash
-python main.py apostas --lesoes
-```
+Cada jogo no relatório vem com um link pronto ("lesões `<equipa>` hoje" no
+Google) para cada equipa — sem custo nem configuração. **Isto é só um
+atalho de pesquisa — o modelo NÃO ajusta probabilidades com base em
+lesões.** Estimar quanto uma lesão específica vale em golos esperados é um
+problema bem mais difícil do que esta ferramenta tenta resolver; a ideia é
+clicares e leres antes de confiares numa sugestão.
 
-Mostra, por jogo, as lesões reportadas recentemente em cada equipa (via
-[API-Football](https://dashboard.api-football.com/register), free tier:
-100 pedidos/dia — precisa de `API_FOOTBALL_KEY` no `.env`). **Isto é só
-informativo — o modelo NÃO ajusta probabilidades com base nisto.** Estimar
-quanto uma lesão específica vale em golos esperados é um problema bem mais
-difícil do que esta ferramenta tenta resolver; a ideia é leres isto antes
-de confiares numa sugestão, não que o bot já tenha "descontado" a lesão.
-
-⚠️ Desligado por omissão (fica ao critério de `--lesoes` para não gastares
-a cota sem querer — cada equipa nova custa 2 pedidos: procurar o ID +
-listar lesões, com cache dentro da mesma execução). Os dados podem não
-estar atualizados ao minuto — confirma sempre no site do clube ou na
-imprensa antes do jogo.
+⚠️ Chegámos a integrar a [API-Football](https://dashboard.api-football.com)
+para isto automaticamente, mas o **free tier dela só dá acesso a épocas de
+2022-2024, não à época atual** — inútil para lesões de jogos futuros. Não
+há como contornar isto sem um plano pago; o link de pesquisa é o
+substituto sem custo.
 
 ## Como funciona (por baixo do `apostas`)
 
@@ -422,23 +416,22 @@ margem mínima, cálculo de stakes), o Kelly fracionado, o carregamento de
 odds (formato normalizado e formato bruto da The Odds API), o modelo de
 Poisson e o cálculo de forças de ataque/defesa (com e sem encolhimento e
 decaimento por recência), a correspondência de nomes de equipas entre as
-duas fontes (com casos reais que já falharam), a lógica de sugestões
-(`apostas`), as lesões (API-Football, com cache e tratamento de erros), e
-as regras de quando o executor pode ou não executar uma ordem real. Correm
-automaticamente em CI (`.github/workflows/bettingbot-tests.yml`) em cada
-push/PR que toque na pasta `bettingbot/`.
+duas fontes (com casos reais que já falharam), e a lógica de sugestões
+(`apostas`), e as regras de quando o executor pode ou não executar uma
+ordem real. Correm automaticamente em CI
+(`.github/workflows/bettingbot-tests.yml`) em cada push/PR que toque na
+pasta `bettingbot/`.
 
 ## Estrutura do projeto
 
-- `config.py` — todos os parâmetros (odds, deteção, modelo, sugestões, lesões, risco, execução)
+- `config.py` — todos os parâmetros (odds, deteção, modelo, sugestões, risco, execução)
 - `app/odds.py` — obtenção de odds (The Odds API ou JSON local), filtros de data, diagnóstico de bookmakers
 - `app/arbitrage.py` — deteção de arbitragem e de apostas de valor
 - `app/stats.py` — estatísticas de golos por equipa (football-data.org), com decaimento por recência
 - `app/poisson.py` — modelo de Poisson (golos esperados → probabilidades)
 - `app/model.py` — correspondência de nomes de equipas + compara o modelo com as odds
-- `app/lesoes.py` — lesões recentes por equipa (API-Football, só informativo)
-- `app/recomendacao.py` — transforma a análise de um jogo numa sugestão concreta
-- `app/analise.py` — junta estatísticas, odds e lesões de uma competição num intervalo de datas
+- `app/recomendacao.py` — transforma a análise de um jogo numa sugestão concreta (inclui o link de pesquisa de lesões)
+- `app/analise.py` — junta estatísticas e odds de uma competição num intervalo de datas
 - `app/relatorio.py` — gera o relatório HTML do comando `apostas`
 - `app/staking.py` — dimensionamento de apostas (Kelly fracionado)
 - `app/notifier.py` — alertas por Telegram
@@ -461,10 +454,8 @@ push/PR que toque na pasta `bettingbot/`.
   simples (golos marcados/sofridos com encolhimento e decaimento por
   recência — sem suspensões, onzes prováveis nem contexto tático) — nada
   disto garante lucro.
-- Lesões (`--lesoes`) são só informativas — o modelo não ajusta
-  probabilidades com base nelas — e dependem do free tier da API-Football
-  (100 pedidos/dia); em ligas menos cobertas por essa API pode não
-  encontrar a equipa ou não ter dados.
+- Lesões são só um link de pesquisa manual por equipa — o modelo não ajusta
+  probabilidades com base nelas (ver "Lesões (link de pesquisa)" acima).
 - Sem backtesting histórico real: ao contrário de preços de criptomoedas,
   odds históricas com resultados liquidados não estão disponíveis de forma
   simples e gratuita — o bot só analisa odds ao vivo/pré-jogo.
@@ -489,8 +480,9 @@ push/PR que toque na pasta `bettingbot/`.
 - Integrar odds reais de over/under e BTTS, para `apostas`/`modelo`
   comparar essas previsões com o mercado (não só o 1X2).
 - Ajustar automaticamente o modelo quando há lesões de jogadores
-  importantes (hoje é só informativo) — precisaria de saber o impacto de
-  cada jogador na força da equipa, um problema bem mais difícil.
+  importantes (hoje é só um link de pesquisa manual) — precisaria de saber
+  o impacto de cada jogador na força da equipa, um problema bem mais
+  difícil.
 - Registo em base de dados do histórico de sugestões e resultados reais,
   para avaliar a taxa de acerto ao longo do tempo (equivalente ao que o
   `cryptobot` já mostrou: comparar sempre com o resultado de "não fazer

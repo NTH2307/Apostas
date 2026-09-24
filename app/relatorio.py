@@ -51,9 +51,8 @@ h2 { font-size: 1.15rem; margin: 32px 0 12px; text-transform: capitalize; }
   border: 1px solid currentColor; font-weight: 500; }
 .alt { margin-top: 8px; font-size: 0.9rem; color: var(--muted); }
 .aviso { background: var(--aviso-bg); color: var(--aviso); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 0.88rem; }
-.lesoes { margin-top: 8px; font-size: 0.88rem; border-left: 3px solid var(--border); padding-left: 10px; }
-.lesoes ul { margin: 4px 0 0; padding-left: 18px; }
-.lesoes li { margin: 2px 0; }
+.lesoes { margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
+.lesoes a { color: var(--azul); }
 details { margin-top: 10px; }
 summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
 table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 0.88rem; }
@@ -83,14 +82,14 @@ def _texto_sugestao(analise: AnaliseJogo) -> str:
     return "Mercado e modelo estão alinhados, ou os dados não chegam para uma opinião fiável."
 
 
-def _bloco_lesoes(equipa: str, lesoes: list) -> str:
-    if not lesoes:
-        return ""
-    itens = "".join(
-        f"<li>{escape(l['jogador'])} — {escape(l['motivo'])} <span class='meta'>({l['data']})</span></li>"
-        for l in lesoes[:6]
+def _bloco_lesoes(casa: str, fora: str, link_casa: str, link_fora: str) -> str:
+    return (
+        "<div class='lesoes'>Lesões/notícias de última hora: "
+        f"<a href='{escape(link_casa)}' target='_blank' rel='noopener'>{escape(casa)}</a>"
+        " · "
+        f"<a href='{escape(link_fora)}' target='_blank' rel='noopener'>{escape(fora)}</a>"
+        "</div>"
     )
-    return f"<div class='lesoes'><strong>{escape(equipa)} — lesões reportadas recentemente:</strong><ul>{itens}</ul></div>"
 
 
 def _card(analise: AnaliseJogo) -> str:
@@ -105,7 +104,7 @@ def _card(analise: AnaliseJogo) -> str:
         for a in analise.alternativas
     )
     avisos = "".join(f'<div class="aviso">⚠️ {escape(a)}</div>' for a in analise.avisos)
-    lesoes = _bloco_lesoes(analise.casa, analise.lesoes_casa) + _bloco_lesoes(analise.fora, analise.lesoes_fora)
+    lesoes = _bloco_lesoes(analise.casa, analise.fora, analise.link_lesoes_casa, analise.link_lesoes_fora)
 
     linhas_1x2 = "".join(
         f"<tr><td>{escape(rotulo)}</td><td>{_pct(analise.prob_modelo[lado])}</td>"
@@ -212,9 +211,8 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
     <p>⚠️ Isto é uma leitura estatística, não uma garantia: mesmo as sugestões de confiança alta perdem muitas vezes, e as
     casas de apostas têm mais informação do que este modelo (lesões, onzes, motivação). Aposta só o que estás disposto a
     perder. Se o jogo deixar de ser diversão, procura ajuda em <a href="https://www.sicad.pt">sicad.pt</a>.</p>
-    <p>⚠️ As "lesões reportadas recentemente" (quando presentes) são só informativas — não entram no cálculo das
-    probabilidades, e podem não estar atualizadas ao minuto. Confirma sempre no site do clube ou na imprensa antes
-    do jogo, sobretudo perto da hora do apito inicial.</p>
+    <p>⚠️ Os links de "lesões/notícias de última hora" são só atalhos de pesquisa — não entram no cálculo das
+    probabilidades. Confirma sempre antes do jogo, sobretudo perto da hora do apito inicial.</p>
   </footer>
 </main>
 </body>

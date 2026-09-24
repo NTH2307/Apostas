@@ -45,40 +45,12 @@ def test_analisar_competicao_analisa_jogos_do_periodo(monkeypatch):
     assert resultado.sem_dados == ["Equipa C vs Equipa D"]
 
 
-def test_analisar_competicao_sem_lesoes_por_omissao(monkeypatch):
+def test_analisar_competicao_inclui_link_pesquisa_lesoes(monkeypatch):
     jogos = [{"casa": "A", "fora": "B", "golos_casa": 1, "golos_fora": 0}] * 6
     monkeypatch.setattr(analise_mod, "buscar_jogos_terminados", lambda competicao, limite: jogos)
     monkeypatch.setattr(analise_mod, "buscar_odds", lambda desporto: [_evento("A", "B")])
-    chamadas = []
-    monkeypatch.setattr(analise_mod, "procurar_equipa_id", lambda nome: chamadas.append(nome) or 1)
 
     resultado = analisar_competicao("PL", "soccer_epl", date(2026, 9, 24), date(2026, 9, 30))
-    assert chamadas == []
-    assert resultado.analises[0].lesoes_casa == []
 
-
-def test_analisar_competicao_com_lesoes_preenche_e_usa_cache(monkeypatch):
-    jogos = [{"casa": "A", "fora": "B", "golos_casa": 1, "golos_fora": 0}] * 6
-    monkeypatch.setattr(analise_mod, "buscar_jogos_terminados", lambda competicao, limite: jogos)
-    monkeypatch.setattr(analise_mod, "buscar_odds", lambda desporto: [_evento("A", "B"), _evento("B", "A")])
-    chamadas_id = []
-    monkeypatch.setattr(analise_mod, "procurar_equipa_id", lambda nome: chamadas_id.append(nome) or 1)
-    monkeypatch.setattr(analise_mod, "lesoes_recentes", lambda team_id: [{"jogador": "X", "motivo": "Y", "data": "2026-09-20"}])
-
-    resultado = analisar_competicao("PL", "soccer_epl", date(2026, 9, 24), date(2026, 9, 30), com_lesoes=True)
-
-    assert resultado.analises[0].lesoes_casa == [{"jogador": "X", "motivo": "Y", "data": "2026-09-20"}]
-    assert resultado.analises[0].lesoes_fora == [{"jogador": "X", "motivo": "Y", "data": "2026-09-20"}]
-    # A e B aparecem em ambos os jogos (casa/fora trocados) -> só 1 pedido por equipa, graças à cache
-    assert sorted(chamadas_id) == ["A", "B"]
-
-
-def test_analisar_competicao_erro_nas_lesoes_nao_rebenta(monkeypatch, capsys):
-    jogos = [{"casa": "A", "fora": "B", "golos_casa": 1, "golos_fora": 0}] * 6
-    monkeypatch.setattr(analise_mod, "buscar_jogos_terminados", lambda competicao, limite: jogos)
-    monkeypatch.setattr(analise_mod, "buscar_odds", lambda desporto: [_evento("A", "B")])
-    monkeypatch.setattr(analise_mod, "procurar_equipa_id", lambda nome: (_ for _ in ()).throw(RuntimeError("sem chave")))
-
-    resultado = analisar_competicao("PL", "soccer_epl", date(2026, 9, 24), date(2026, 9, 30), com_lesoes=True)
-    assert resultado.analises[0].lesoes_casa == []
-    assert "sem chave" in capsys.readouterr().out
+    assert "google.com/search" in resultado.analises[0].link_lesoes_casa
+    assert "google.com/search" in resultado.analises[0].link_lesoes_fora
