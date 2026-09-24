@@ -15,25 +15,32 @@ execução automática de apostas.
 python main.py apostas
 ```
 
-Isto analisa os próximos 7 dias nas principais ligas de futebol (`.env`,
-`COMPETICOES_MODELO`), gera `relatorio_apostas.html`, e abre-o no browser.
+Por omissão mostra **só os jogos de hoje** (`APOSTAS_DIAS=1` no `.env`) nas
+principais ligas de futebol (`COMPETICOES_MODELO`), gera
+`relatorio_apostas.html`, e abre-o no browser — pensado para abrires todos
+os dias e veres um punhado de jogos, não uma lista interminável. Se hoje
+não houver jogos em nenhuma competição (ex: pausa internacional), o
+relatório diz isso claramente em vez de aparecer vazio sem explicação.
+
 Por cada jogo com uma sugestão, o relatório mostra: a aposta concreta
 ("Vitória do Arsenal @ 1.78 na Betfair"), a stake sugerida, a confiança
 (alta/média/baixa, consoante quantos jogos há na amostra de cada equipa),
-e os números todos por trás (para quem quiser verificar). Jogos sem
-sugestão aparecem como "sem aposta recomendada" — o bot não força uma
-opinião quando os dados não dão para isso.
+lesões recentes (com `--lesoes`), e os números todos por trás (para quem
+quiser verificar). Jogos sem sugestão aparecem como "sem aposta
+recomendada" — o bot não força uma opinião quando os dados não dão para
+isso.
 
 Opções úteis:
 
 ```bash
-python main.py apostas --amanha                       # só amanhã
+python main.py apostas --lesoes                        # + lesões recentes por equipa (ver secção própria)
+python main.py apostas --dias 7                        # alarga a janela (omissão: só hoje)
+python main.py apostas --amanha                        # só amanhã
 python main.py apostas --dia 2026-10-04                # só um dia específico
 python main.py apostas --competicao PL --desporto soccer_epl  # só uma liga
 python main.py apostas --bookmakers "Betfair,Pinnacle"  # restringe casas (usa `bookmakers` para veres nomes exatos)
 python main.py apostas --capital 50                    # a tua banca, para calcular stakes
 python main.py apostas --sem-browser                   # não abre o browser sozinho
-python main.py apostas --lesoes                        # mostra lesões recentes por equipa (ver secção própria)
 ```
 
 ## ⚠️ Importante — lê isto antes de arriscar dinheiro real
