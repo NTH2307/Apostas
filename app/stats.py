@@ -100,15 +100,29 @@ def _normalizar_jogos(jogos_brutos: list[dict]) -> list[dict]:
     ]
 
 
-def calcular_forcas(jogos: list[dict]) -> dict:
+def _encolher(total: float, n_jogos: int, media_liga: float, peso_prior: float) -> float:
+    """Força relativa à média da liga, "encolhida" para 1.0 (equipa média)
+    como se a equipa tivesse mais `peso_prior` jogos perfeitamente médios.
+    Com muitos jogos quase não mexe; com 1-2 jogos impede conclusões
+    extremas (ex: "nunca marca" só porque falhou 2 jogos)."""
+    if not media_liga or n_jogos + peso_prior == 0:
+        return 1.0
+    bruto = (total / n_jogos / media_liga) if n_jogos else 1.0
+    return (n_jogos * bruto + peso_prior * 1.0) / (n_jogos + peso_prior)
+
+
+def calcular_forcas(jogos: list[dict], peso_prior: float | None = None) -> dict:
     """A partir de jogos terminados, calcula a força de ataque/defesa de
     cada equipa em casa e fora, relativa à média da competição.
 
     Devolve {"media_golos_casa": float, "media_golos_fora": float,
     "equipas": {"<nome>": {"ataque_casa", "defesa_casa", "ataque_fora",
-    "defesa_fora"}}}. Uma equipa com poucos ou nenhuns jogos numa das
-    vertentes (casa/fora) fica com força neutra (1.0) nessa vertente.
+    "defesa_fora", "jogos"}}}. As forças são encolhidas para a média da
+    liga consoante o número de jogos (ver `_encolher`, peso
+    `config.MODELO_PESO_PRIOR`); `peso_prior=0` dá as forças brutas.
     """
+    if peso_prior is None:
+        peso_prior = config.MODELO_PESO_PRIOR
     if not jogos:
         return {"media_golos_casa": 0.0, "media_golos_fora": 0.0, "equipas": {}}
 
@@ -137,10 +151,11 @@ def calcular_forcas(jogos: list[dict]) -> dict:
         n_casa = jogos_casa.get(nome, 0)
         n_fora = jogos_fora.get(nome, 0)
         equipas[nome] = {
-            "ataque_casa": (marcados_casa.get(nome, 0) / n_casa / media_golos_casa) if n_casa and media_golos_casa else 1.0,
-            "defesa_casa": (sofridos_casa.get(nome, 0) / n_casa / media_golos_fora) if n_casa and media_golos_fora else 1.0,
-            "ataque_fora": (marcados_fora.get(nome, 0) / n_fora / media_golos_fora) if n_fora and media_golos_fora else 1.0,
-            "defesa_fora": (sofridos_fora.get(nome, 0) / n_fora / media_golos_casa) if n_fora and media_golos_casa else 1.0,
+            "ataque_casa": _encolher(marcados_casa.get(nome, 0), n_casa, media_golos_casa, peso_prior),
+            "defesa_casa": _encolher(sofridos_casa.get(nome, 0), n_casa, media_golos_fora, peso_prior),
+            "ataque_fora": _encolher(marcados_fora.get(nome, 0), n_fora, media_golos_fora, peso_prior),
+            "defesa_fora": _encolher(sofridos_fora.get(nome, 0), n_fora, media_golos_casa, peso_prior),
+            "jogos": n_casa + n_fora,
         }
 
     return {"media_golos_casa": media_golos_casa, "media_golos_fora": media_golos_fora, "equipas": equipas}

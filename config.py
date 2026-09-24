@@ -35,6 +35,23 @@ FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_DATA_API_KEY", "")
 FOOTBALL_DATA_BASE_URL = os.getenv("FOOTBALL_DATA_BASE_URL", "https://api.football-data.org/v4")
 MODELO_JOGOS_HISTORICO = int(os.getenv("MODELO_JOGOS_HISTORICO", 200))  # jogos terminados usados para calcular forças
 MODELO_MARGEM_MINIMA = float(os.getenv("MODELO_MARGEM_MINIMA", 0.05))   # mais exigente que o valor de mercado — o modelo também pode estar errado
+# "Jogos fictícios" de equipa média somados a cada equipa ao calcular forças
+# — impede que 1-2 jogos atípicos deem forças extremas (ex: 0 golos esperados).
+MODELO_PESO_PRIOR = float(os.getenv("MODELO_PESO_PRIOR", 5))
+
+# --- Sugestões de aposta (comando `apostas`, ver app/recomendacao.py) ---
+# Peso do modelo vs. consenso do mercado na probabilidade final do 1X2 (0 =
+# só mercado, 1 = só modelo). O mercado agrega muito mais informação do que
+# um modelo de golos, por isso o modelo só "inclina" a opinião do mercado.
+APOSTAS_PESO_MODELO = float(os.getenv("APOSTAS_PESO_MODELO", 0.35))
+# Idem para golos (over/under, ambas marcam), mas contra a média da liga,
+# já que não temos odds desses mercados para comparar.
+APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
+APOSTAS_MARGEM_MINIMA = float(os.getenv("APOSTAS_MARGEM_MINIMA", 0.03))     # valor mínimo para sugerir um 1X2
+APOSTAS_VALOR_SUSPEITO = float(os.getenv("APOSTAS_VALOR_SUSPEITO", 0.20))   # acima disto, desconfia em vez de apostar
+APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # confiança mínima para sugerir um mercado de golos
+APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 7))                            # janela de dias a analisar por omissão
+RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))
 
 # Pares "código football-data.org:chave The Odds API" para `modelo --todas`
 # — todas as competições de futebol de clubes cobertas pelo free tier da

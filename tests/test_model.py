@@ -11,7 +11,13 @@ def test_normalizar_nome_equipa_remove_sufixos_e_prefixos_comuns():
 
 def test_normalizar_nome_equipa_remove_acentos_e_pontuacao():
     assert normalizar_nome_equipa("1. FC Köln") == "koln"
-    assert normalizar_nome_equipa("Deportivo La Coruña") == "deportivo la coruna"
+    assert normalizar_nome_equipa("Deportivo La Coruña") == "deportivo coruna"
+
+
+def test_normalizar_nome_equipa_remove_anos_e_palavras_de_ligacao():
+    assert normalizar_nome_equipa("Parma Calcio 1913") == "parma"
+    assert normalizar_nome_equipa("TSG 1899 Hoffenheim") == "hoffenheim"
+    assert normalizar_nome_equipa("Brighton & Hove Albion FC") == normalizar_nome_equipa("Brighton and Hove Albion")
 
 
 def test_encontrar_nome_equivalente_ignora_sufixo_e_maiusculas():
@@ -22,6 +28,44 @@ def test_encontrar_nome_equivalente_ignora_sufixo_e_maiusculas():
 
 def test_encontrar_nome_equivalente_sem_correspondencia():
     assert encontrar_nome_equivalente("Benfica", ["Arsenal FC"]) is None
+
+
+def test_encontrar_nome_equivalente_casos_reais_entre_as_duas_fontes():
+    # pares (nome The Odds API, nome football-data.org) que falhavam antes
+    casos = [
+        ("Brighton and Hove Albion", "Brighton & Hove Albion FC"),
+        ("Napoli", "SSC Napoli"),
+        ("Genoa", "Genoa CFC"),
+        ("Fiorentina", "ACF Fiorentina"),
+        ("Inter Milan", "FC Internazionale Milano"),
+        ("Bayern Munich", "FC Bayern München"),
+        ("Sporting Lisbon", "Sporting Clube de Portugal"),
+        ("Braga", "Sporting Clube de Braga"),
+        ("RC Lens", "Racing Club de Lens"),
+        ("Lyon", "Olympique Lyonnais"),
+        ("PSV Eindhoven", "PSV"),
+        ("Bragantino-SP", "Red Bull Bragantino"),
+        ("Flamengo-RJ", "CR Flamengo"),
+        ("Estudiantes La Plata", "Estudiantes de La Plata"),
+        ("Athletic Bilbao", "Athletic Club"),
+        ("Atlético Madrid", "Club Atlético de Madrid"),
+        ("FSV Mainz 05", "1. FSV Mainz 05"),
+        ("Bayer Leverkusen", "Bayer 04 Leverkusen"),
+    ]
+    for nome_odds, nome_stats in casos:
+        disponiveis = [nome_stats, "Arsenal FC", "Real Madrid CF", "Sporting Clube de Portugal" if nome_stats != "Sporting Clube de Portugal" else "SL Benfica"]
+        assert encontrar_nome_equivalente(nome_odds, disponiveis) == nome_stats, nome_odds
+
+
+def test_encontrar_nome_equivalente_ambiguo_devolve_none():
+    # "Manchester" está contido nos dois — melhor não adivinhar
+    assert encontrar_nome_equivalente("Manchester", ["Manchester United FC", "Manchester City FC"]) is None
+
+
+def test_encontrar_nome_equivalente_nao_confunde_braga_com_sporting():
+    disponiveis = ["Sporting Clube de Portugal", "Sporting Clube de Braga"]
+    assert encontrar_nome_equivalente("Sporting Lisbon", disponiveis) == "Sporting Clube de Portugal"
+    assert encontrar_nome_equivalente("Braga", disponiveis) == "Sporting Clube de Braga"
 
 
 def _evento(equipas, bookmakers):

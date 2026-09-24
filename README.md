@@ -1,9 +1,39 @@
 # BettingBot
 
-Ferramenta de análise de odds desportivas: procura **arbitragens** (surebets)
-e **apostas de valor** entre várias casas de apostas, envia alertas
-(Telegram), e — só na **Betfair Exchange** — pode colocar apostas
-automaticamente.
+Ferramenta de análise de odds desportivas. O comando principal é
+**`apostas`**: analisa os jogos dos próximos dias em várias ligas de
+futebol e diz-te, jogo a jogo, **o que apostar** (ou "não apostes neste"),
+com uma stake sugerida e o porquê — e abre um relatório num site local no
+browser em vez de despejar texto no terminal. Também tem ferramentas mais
+específicas: **arbitragens** (surebets) e **apostas de valor** entre
+bookmakers, alertas por Telegram, e — só na **Betfair Exchange** —
+execução automática de apostas.
+
+## Começa por aqui: `apostas`
+
+```bash
+python main.py apostas
+```
+
+Isto analisa os próximos 7 dias nas principais ligas de futebol (`.env`,
+`COMPETICOES_MODELO`), gera `relatorio_apostas.html`, e abre-o no browser.
+Por cada jogo com uma sugestão, o relatório mostra: a aposta concreta
+("Vitória do Arsenal @ 1.78 na Betfair"), a stake sugerida, a confiança
+(alta/média/baixa, consoante quantos jogos há na amostra de cada equipa),
+e os números todos por trás (para quem quiser verificar). Jogos sem
+sugestão aparecem como "sem aposta recomendada" — o bot não força uma
+opinião quando os dados não dão para isso.
+
+Opções úteis:
+
+```bash
+python main.py apostas --amanha                       # só amanhã
+python main.py apostas --dia 2026-10-04                # só um dia específico
+python main.py apostas --competicao PL --desporto soccer_epl  # só uma liga
+python main.py apostas --bookmakers "Betfair,Betano,Bwin"     # restringe casas
+python main.py apostas --capital 50                    # a tua banca, para calcular stakes
+python main.py apostas --sem-browser                   # não abre o browser sozinho
+```
 
 ## ⚠️ Importante — lê isto antes de arriscar dinheiro real
 
@@ -42,7 +72,36 @@ automaticamente.
   jurisdição** antes de usar este bot com dinheiro real — varia por país
   (e, nalguns, por região).
 
-## Como funciona
+## Como o `apostas` decide (lê isto antes de confiar numa sugestão)
+
+Para cada jogo:
+
+1. Calcula golos esperados com o modelo de Poisson (mesma base do comando
+   `modelo`), mas com as forças de ataque/defesa **"encolhidas" para a
+   média da liga** consoante o número de jogos de cada equipa
+   (`MODELO_PESO_PRIOR`) — uma equipa com só 1-2 jogos não pode parecer
+   "nunca marca" ou "imbatível" só por acaso da amostra.
+2. Mistura a probabilidade do modelo com a do consenso do mercado
+   (`APOSTAS_PESO_MODELO`, omissão 35% modelo / 65% mercado — o mercado
+   agrega muita mais informação do que este modelo, por isso pesa mais) e
+   compara essa probabilidade final com a **melhor odd real** disponível.
+3. Só sugere apostar no resultado (1X2) se o valor esperado for positivo
+   **e plausível**: valores muito grandes (`APOSTAS_VALOR_SUSPEITO`,
+   omissão 20%) são tratados como sinal de que falta informação ao
+   modelo, não como boa notícia — nesse caso a confiança cai para "baixa"
+   e não é a sugestão principal.
+4. Sem odds de golos (over/under, ambas marcam) para comparar, a sugestão
+   nesses mercados vem com uma **odd mínima**: confirmas tu se a tua casa
+   paga acima disso.
+5. Se nada disto passar o crivo: "sem aposta recomendada" — é uma
+   resposta válida, não uma falha.
+
+A **confiança** depende só de quantos jogos há na amostra da equipa com
+menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor
+encontrado, porque valores maiores tendem a vir de amostras piores, não de
+oportunidades melhores.
+
+## Como funciona (por baixo do `apostas`)
 
 1. **Odds** (`app/odds.py`): obtém odds de várias casas de apostas via
    [The Odds API](https://the-odds-api.com) (tem free tier), ou carrega um
@@ -317,25 +376,30 @@ python -m pytest tests/ -v
 Cobrem a matemática de arbitragem e de valor (deteção, filtragem por
 margem mínima, cálculo de stakes), o Kelly fracionado, o carregamento de
 odds (formato normalizado e formato bruto da The Odds API), o modelo de
-Poisson e o cálculo de forças de ataque/defesa, e as regras de quando o
-executor pode ou não executar uma ordem real. Correm automaticamente em CI
-(`.github/workflows/bettingbot-tests.yml`) em cada push/PR que toque na
-pasta `bettingbot/`.
+Poisson e o cálculo de forças de ataque/defesa (com e sem encolhimento
+para a média), a correspondência de nomes de equipas entre as duas fontes
+(com casos reais que já falharam), a lógica de sugestões (`apostas`) e as
+regras de quando o executor pode ou não executar uma ordem real. Correm
+automaticamente em CI (`.github/workflows/bettingbot-tests.yml`) em cada
+push/PR que toque na pasta `bettingbot/`.
 
 ## Estrutura do projeto
 
-- `config.py` — todos os parâmetros (odds, deteção, modelo, risco, execução)
-- `app/odds.py` — obtenção de odds (The Odds API ou JSON local)
+- `config.py` — todos os parâmetros (odds, deteção, modelo, sugestões, risco, execução)
+- `app/odds.py` — obtenção de odds (The Odds API ou JSON local), filtros de data
 - `app/arbitrage.py` — deteção de arbitragem e de apostas de valor
 - `app/stats.py` — estatísticas de golos por equipa (football-data.org)
 - `app/poisson.py` — modelo de Poisson (golos esperados → probabilidades)
-- `app/model.py` — compara o modelo com as odds de mercado
+- `app/model.py` — correspondência de nomes de equipas + compara o modelo com as odds
+- `app/recomendacao.py` — transforma a análise de um jogo numa sugestão concreta
+- `app/analise.py` — junta estatísticas e odds de uma competição num intervalo de datas
+- `app/relatorio.py` — gera o relatório HTML do comando `apostas`
 - `app/staking.py` — dimensionamento de apostas (Kelly fracionado)
 - `app/notifier.py` — alertas por Telegram
 - `app/betfair_client.py` — cliente da Betfair Exchange (execução real)
 - `app/executor.py` — execução de apostas (paper ou real, só Betfair)
 - `app/live.py` — loop de verificação contínua e resumo diário
-- `main.py` — CLI (`arbitragem` / `valor` / `modelo` / `resumo` / `desportos` / `live`)
+- `main.py` — CLI (`apostas` / `arbitragem` / `valor` / `modelo` / `resumo` / `desportos` / `competicoes` / `live`)
 - `data/exemplo_odds.json` — dados de exemplo para testar sem API key
 - `tests/` — testes automatizados (pytest)
 
@@ -343,20 +407,23 @@ pasta `bettingbot/`.
 
 - Mercados de odds só de vencedor (`h2h`) — sem over/under, handicaps, etc.
   integrados com odds reais (o modelo calcula over/under e BTTS, mas ainda
-  sem odds desses mercados para comparar).
+  sem odds desses mercados para comparar; `apostas` sugere esses mercados
+  com uma odd mínima em vez de comparar com odds reais).
 - "Valor" (comparação entre casas) é uma heurística sobre o consenso do
-  mercado. O `modelo` (comparação com golos reais) é mais parecido com uma
-  previsão própria, mas continua a ser um modelo simples (média da época,
-  sem lesões/suspensões/contexto) — nenhum dos dois garante lucro.
+  mercado. `apostas`/`modelo` (comparação com golos reais) são mais
+  parecidos com uma previsão própria, mas continuam a ser um modelo
+  simples (média da época com encolhimento para amostras pequenas, sem
+  lesões/suspensões/contexto) — nada disto garante lucro.
 - Sem backtesting histórico real: ao contrário de preços de criptomoedas,
   odds históricas com resultados liquidados não estão disponíveis de forma
   simples e gratuita — o bot só analisa odds ao vivo/pré-jogo.
 - Correspondência de nomes de equipas entre a The Odds API e a
-  football-data.org é por normalização simples (remove acentos, pontuação,
-  e tokens comuns de clube como "FC"/"AFC" do início ou fim do nome) —
-  ajuda em casos comuns ("FC Barcelona" ↔ "Barcelona") mas pode falhar em
-  nomes muito diferentes entre as duas fontes (traduções, abreviaturas
-  pouco usuais).
+  football-data.org (`app/model.py`) trata prefixos/sufixos de clube,
+  acentos, anos de fundação e vários apelidos comuns (Inter/Internazionale,
+  Sporting Lisbon/Sporting CP, PSV/PSV Eindhoven) — reduz muito as falhas
+  mas continua a poder falhar em nomes muito diferentes entre as duas
+  fontes; jogos assim ficam listados como "sem dados suficientes" em vez
+  de arriscar uma correspondência errada.
 - Execução automática limitada à Betfair Exchange, e ainda sem o mapeamento
   automático evento → `market_id`/`selection_id` da Betfair (ver secção
   acima).
@@ -368,11 +435,11 @@ pasta `bettingbot/`.
 - Mapeamento automático de eventos da The Odds API para mercados da
   Betfair (via `list_market_catalogue`), para a execução real ficar
   completa.
-- Integrar odds reais de over/under e BTTS, para o modelo comparar essas
-  previsões com o mercado (não só o 1X2).
+- Integrar odds reais de over/under e BTTS, para `apostas`/`modelo`
+  comparar essas previsões com o mercado (não só o 1X2).
 - Modelo com peso maior para jogos recentes (ex: decaimento exponencial)
   em vez de média simples da época.
-- Registo em base de dados do histórico de oportunidades e apostas
-  simuladas, para avaliar a estratégia ao longo do tempo (equivalente ao
-  que o `cryptobot` já mostrou: comparar sempre com o resultado de "não
-  fazer nada").
+- Registo em base de dados do histórico de sugestões e resultados reais,
+  para avaliar a taxa de acerto ao longo do tempo (equivalente ao que o
+  `cryptobot` já mostrou: comparar sempre com o resultado de "não fazer
+  nada").

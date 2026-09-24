@@ -1,13 +1,19 @@
-"""CLI do BettingBot: `arbitragem`, `valor`, `desportos` ou `live`."""
+"""CLI do BettingBot — `python main.py apostas` é o comando principal (diz-te,
+jogo a jogo, o que apostar); os restantes são ferramentas de análise."""
 import argparse
 import time
-from datetime import date
+import webbrowser
+from datetime import date, timedelta
+from pathlib import Path
 
 import config
+from app.analise import analisar_competicao
 from app.arbitrage import detetar_arbitragem, detetar_valor, filtrar_bookmakers
 from app.live import correr_loop, resumo_diario
+from app.recomendacao import chave_ordenacao
+from app.relatorio import gerar_html
 from app.model import avaliar_evento, encontrar_nome_equivalente
-from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, listar_desportos, proxima_data_com_jogos
+from app.odds import amanha, buscar_odds, carregar_json, filtrar_por_dia, hoje, listar_desportos, proxima_data_com_jogos
 from app.poisson import golos_esperados, probabilidades
 from app.stats import buscar_jogos_terminados, calcular_forcas, listar_competicoes
 
@@ -213,6 +219,74 @@ def cmd_modelo(args):
     )
 
 
+def _intervalo_datas(args) -> tuple[date, date]:
+    if getattr(args, "dia", None):
+        dia = date.fromisoformat(args.dia)
+        return dia, dia
+    if getattr(args, "amanha", False):
+        return amanha(), amanha()
+    inicio = hoje()
+    return inicio, inicio + timedelta(days=max(args.dias, 1) - 1)
+
+
+def _linha_sugestao(analise) -> str:
+    s = analise.sugestao
+    quando = analise.inicio.strftime("%d/%m %H:%M") if analise.inicio else "—"
+    extra = f" · stake {s.stake:.2f}€" if s.tipo == "1x2" and s.stake else ""
+    return (f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n"
+            f"   🎯 {s.texto}{extra} · confiança {s.confianca}")
+
+
+def cmd_apostas(args):
+    if args.competicao and args.desporto:
+        pares = [(args.competicao, args.desporto)]
+    elif args.competicao or args.desporto:
+        print("Usa --competicao e --desporto juntos (ou nenhum dos dois, para todas as competições).")
+        return
+    else:
+        pares = config.COMPETICOES_MODELO
+
+    inicio, fim = _intervalo_datas(args)
+    bookmakers = args.bookmakers.split(",") if args.bookmakers else None
+    print(f"A analisar {len(pares)} competição(ões), jogos de {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}...")
+
+    resultados = []
+    for indice, (competicao, desporto) in enumerate(pares):
+        if indice > 0:
+            time.sleep(7)  # free tier da football-data.org: 10 pedidos/minuto
+        try:
+            resultado = analisar_competicao(
+                competicao, desporto, inicio, fim, bookmakers=bookmakers,
+                jogos_historico=args.jogos_historico, capital=args.capital,
+            )
+        except Exception as e:
+            print(f"  {competicao}: erro — {e}")
+            continue
+        resultados.append(resultado)
+        print(f"  {resultado.nome}: {len(resultado.analises)} jogo(s) analisado(s)"
+              + (f", {len(resultado.sem_dados)} sem dados" if resultado.sem_dados else "")
+              + (f" ({resultado.nota})" if resultado.nota else ""))
+
+    analises = [a for r in resultados for a in r.analises]
+    com_aposta = sorted((a for a in analises if a.sugestao.tipo != "nenhuma"), key=chave_ordenacao, reverse=True)
+
+    print(f"\n=== {len(com_aposta)} aposta(s) sugerida(s) em {len(analises)} jogo(s) analisados ===\n")
+    for analise in com_aposta[:args.top]:
+        print(_linha_sugestao(analise) + "\n")
+    if len(com_aposta) > args.top:
+        print(f"(+{len(com_aposta) - args.top} sugestões no relatório)\n")
+
+    caminho = Path(args.saida or config.RELATORIO_PATH).resolve()
+    caminho.write_text(gerar_html(resultados, inicio, fim, top=args.top), encoding="utf-8")
+    print(f"Relatório completo (com todos os jogos e os números): {caminho}")
+    if not args.sem_browser:
+        webbrowser.open(caminho.as_uri())
+    print(
+        "\n⚠️ Leitura estatística, não garantia: as casas têm mais informação do que este modelo "
+        "(lesões, onzes, motivação). Aposta só o que estás disposto a perder."
+    )
+
+
 def cmd_resumo(_args):
     resumo_diario()
 
@@ -291,6 +365,25 @@ def main():
     p_modelo.add_argument("--amanha", action="store_true", help="só jogos que começam amanhã, hora de Portugal")
     p_modelo.add_argument("--dia", help="só jogos neste dia, formato AAAA-MM-DD, hora de Portugal")
     p_modelo.set_defaults(func=cmd_modelo)
+
+    p_apostas = subparsers.add_parser(
+        "apostas",
+        help="diz-te, jogo a jogo, o que apostar (ou que não vale a pena) e abre um relatório no browser",
+    )
+    p_apostas.add_argument("--competicao", help="só esta competição (código football-data.org, ex: PL) — requer --desporto")
+    p_apostas.add_argument("--desporto", help="chave da mesma competição na The Odds API (ex: soccer_epl) — requer --competicao")
+    p_apostas.add_argument("--dias", type=int, default=config.APOSTAS_DIAS,
+                           help=f"quantos dias a partir de hoje analisar (omissão: {config.APOSTAS_DIAS})")
+    p_apostas.add_argument("--amanha", action="store_true", help="só jogos de amanhã")
+    p_apostas.add_argument("--dia", help="só jogos deste dia, formato AAAA-MM-DD")
+    p_apostas.add_argument("--bookmakers", help="só estas casas, separadas por vírgula (omissão: BOOKMAKERS_FIAVEIS no .env)")
+    p_apostas.add_argument("--capital", type=float, default=config.CAPITAL_INICIAL,
+                           help="banca total, para calcular a stake sugerida (omissão: CAPITAL_INICIAL no .env)")
+    p_apostas.add_argument("--top", type=int, default=10, help="quantas sugestões mostrar no topo (omissão: 10)")
+    p_apostas.add_argument("--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO)
+    p_apostas.add_argument("--saida", help="onde gravar o relatório HTML (omissão: RELATORIO_PATH, relatorio_apostas.html)")
+    p_apostas.add_argument("--sem-browser", action="store_true", help="não abrir o relatório no browser automaticamente")
+    p_apostas.set_defaults(func=cmd_apostas)
 
     p_resumo = subparsers.add_parser(
         "resumo",

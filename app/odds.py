@@ -98,8 +98,12 @@ def _filtrar_desportos(desportos: list[dict], filtro: str | None) -> list[dict]:
     ]
 
 
+def hoje(fuso: str = FUSO_PADRAO) -> date:
+    return datetime.now(ZoneInfo(fuso)).date()
+
+
 def amanha(fuso: str = FUSO_PADRAO) -> date:
-    return (datetime.now(ZoneInfo(fuso)) + timedelta(days=1)).date()
+    return hoje(fuso) + timedelta(days=1)
 
 
 def filtrar_por_dia(eventos: list[dict], dia: date, fuso: str = FUSO_PADRAO) -> list[dict]:
@@ -114,6 +118,30 @@ def filtrar_por_dia(eventos: list[dict], dia: date, fuso: str = FUSO_PADRAO) -> 
             continue
         inicio = datetime.fromisoformat(hora.replace("Z", "+00:00")).astimezone(zona)
         if inicio.date() == dia:
+            filtrados.append(evento)
+    return filtrados
+
+
+def hora_local(evento: dict, fuso: str = FUSO_PADRAO) -> datetime | None:
+    """Hora de início do evento no fuso indicado (omissão: hora de
+    Portugal), ou None se o evento não tiver `hora_inicio`."""
+    hora = evento.get("hora_inicio")
+    if not hora:
+        return None
+    return datetime.fromisoformat(hora.replace("Z", "+00:00")).astimezone(ZoneInfo(fuso))
+
+
+def filtrar_por_intervalo(
+    eventos: list[dict], inicio: date, fim: date, fuso: str = FUSO_PADRAO, agora: datetime | None = None,
+) -> list[dict]:
+    """Eventos cuja data (hora de Portugal) está entre `inicio` e `fim`,
+    inclusive, e que ainda não começaram (odds de jogos já a decorrer são
+    ao vivo e não fazem sentido para sugestões pré-jogo)."""
+    agora = agora or datetime.now(ZoneInfo(fuso))
+    filtrados = []
+    for evento in eventos:
+        inicio_evento = hora_local(evento, fuso)
+        if inicio_evento and inicio <= inicio_evento.date() <= fim and inicio_evento > agora:
             filtrados.append(evento)
     return filtrados
 

@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
-from app.odds import _filtrar_desportos, filtrar_por_dia, proxima_data_com_jogos
+from app.odds import _filtrar_desportos, filtrar_por_dia, filtrar_por_intervalo, hora_local, proxima_data_com_jogos
 
 
 def _evento(id_, hora_inicio):
@@ -37,6 +38,23 @@ def test_proxima_data_com_jogos_devolve_a_data_mais_cedo():
 def test_proxima_data_com_jogos_sem_eventos_devolve_none():
     assert proxima_data_com_jogos([]) is None
     assert proxima_data_com_jogos([_evento("sem_hora", "")]) is None
+
+
+def test_hora_local_converte_para_fuso_de_portugal():
+    assert hora_local(_evento("e1", "2026-09-27T22:30:00Z")).hour == 23  # verão, UTC+1
+    assert hora_local(_evento("sem_hora", "")) is None
+
+
+def test_filtrar_por_intervalo_mantem_so_o_intervalo_e_jogos_futuros():
+    agora = datetime(2026, 9, 24, 12, 0, tzinfo=ZoneInfo("Europe/Lisbon"))
+    eventos = [
+        _evento("antes", "2026-09-23T10:00:00Z"),   # antes do intervalo
+        _evento("ja_comecou", "2026-09-24T10:00:00Z"),  # dentro do intervalo mas já começou
+        _evento("dentro", "2026-09-25T20:00:00Z"),
+        _evento("depois", "2026-10-05T20:00:00Z"),  # depois do intervalo
+    ]
+    filtrados = filtrar_por_intervalo(eventos, date(2026, 9, 24), date(2026, 9, 30), agora=agora)
+    assert [e["id"] for e in filtrados] == ["dentro"]
 
 
 def test_filtrar_desportos_sem_filtro_devolve_tudo():

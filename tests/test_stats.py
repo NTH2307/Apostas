@@ -33,17 +33,39 @@ def test_calcular_forcas_medias_da_competicao():
     assert forcas["media_golos_fora"] == pytest.approx(1.5)
 
 
-def test_calcular_forcas_equipa_com_bom_ataque_em_casa():
+def test_calcular_forcas_brutas_sem_encolhimento():
     jogos = [
         {"casa": "A", "fora": "B", "golos_casa": 2, "golos_fora": 0},
         {"casa": "C", "fora": "A", "golos_casa": 1, "golos_fora": 3},
     ]
-    forcas = calcular_forcas(jogos)
+    forcas = calcular_forcas(jogos, peso_prior=0)
     a = forcas["equipas"]["A"]
     assert a["ataque_casa"] == pytest.approx((2 / 1) / 1.5)
     assert a["defesa_casa"] == pytest.approx((0 / 1) / 1.5)
     assert a["ataque_fora"] == pytest.approx((3 / 1) / 1.5)
     assert a["defesa_fora"] == pytest.approx((1 / 1) / 1.5)
+    assert a["jogos"] == 2
+
+
+def test_encolhimento_puxa_equipas_com_poucos_jogos_para_a_media():
+    # A marcou 0 golos no único jogo em casa: sem encolhimento, "nunca marca"
+    jogos = [
+        {"casa": "A", "fora": "B", "golos_casa": 0, "golos_fora": 1},
+        {"casa": "B", "fora": "A", "golos_casa": 2, "golos_fora": 2},
+    ]
+    bruto = calcular_forcas(jogos, peso_prior=0)["equipas"]["A"]["ataque_casa"]
+    encolhido = calcular_forcas(jogos, peso_prior=5)["equipas"]["A"]["ataque_casa"]
+    assert bruto == 0
+    assert 0 < encolhido < 1  # continua abaixo da média, mas longe de "nunca marca"
+
+
+def test_encolhimento_quase_nao_mexe_com_muitos_jogos():
+    jogos = [{"casa": "A", "fora": "B", "golos_casa": 3, "golos_fora": 1}] * 40 + [
+        {"casa": "B", "fora": "A", "golos_casa": 1, "golos_fora": 1}
+    ] * 40
+    bruto = calcular_forcas(jogos, peso_prior=0)["equipas"]["A"]["ataque_casa"]
+    encolhido = calcular_forcas(jogos, peso_prior=5)["equipas"]["A"]["ataque_casa"]
+    assert encolhido == pytest.approx(bruto, rel=0.1)
 
 
 def test_calcular_forcas_equipa_so_com_jogos_em_casa_fica_neutra_fora():
