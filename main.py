@@ -285,13 +285,13 @@ def cmd_apostas(args):
               + (f" ({resultado.nota})" if resultado.nota else ""))
 
     analises = [a for r in resultados for a in r.analises]
-    com_aposta = sorted((a for a in analises if a.sugestao.tipo != "nenhuma"), key=chave_ordenacao, reverse=True)
+    melhores = sorted(analises, key=chave_ordenacao, reverse=True)
 
-    print(f"\n=== {len(com_aposta)} aposta(s) sugerida(s) em {len(analises)} jogo(s) analisados ===\n")
-    for analise in com_aposta[:args.top]:
+    print(f"\n=== {len(analises)} jogo(s) analisado(s) — top {min(args.top, len(melhores))} palpites abaixo ===\n")
+    for analise in melhores[:args.top]:
         print(_linha_sugestao(analise) + "\n")
-    if len(com_aposta) > args.top:
-        print(f"(+{len(com_aposta) - args.top} sugestões no relatório)\n")
+    if len(melhores) > args.top:
+        print(f"(+{len(melhores) - args.top} jogos no relatório)\n")
 
     caminho = Path(args.saida or config.RELATORIO_PATH).resolve()
     caminho.write_text(gerar_html(resultados, inicio, fim, top=args.top), encoding="utf-8")

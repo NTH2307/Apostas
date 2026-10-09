@@ -51,8 +51,11 @@ APOSTAS_PESO_MODELO = float(os.getenv("APOSTAS_PESO_MODELO", 0.35))
 # Idem para golos (over/under, ambas marcam), mas contra a média da liga,
 # já que não temos odds desses mercados para comparar.
 APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
-APOSTAS_MARGEM_MINIMA = float(os.getenv("APOSTAS_MARGEM_MINIMA", 0.03))     # valor mínimo para sugerir um 1X2
-APOSTAS_VALOR_SUSPEITO = float(os.getenv("APOSTAS_VALOR_SUSPEITO", 0.20))   # acima disto, desconfia em vez de apostar
+# O palpite do 1X2 é sempre o lado favorito do modelo (não é filtrado pela
+# odd da casa) — isto só controla um aviso: acima deste valor, o "valor"
+# calculado é marcado como pouco credível (normalmente sinal de que falta
+# informação ao modelo), mas o palpite continua a aparecer na mesma.
+APOSTAS_VALOR_SUSPEITO = float(os.getenv("APOSTAS_VALOR_SUSPEITO", 0.20))
 APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # confiança mínima para sugerir um mercado de golos
 APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 1))                            # janela de dias a analisar por omissão (1 = só hoje)
 RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))

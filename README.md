@@ -79,9 +79,10 @@ python main.py apostas --sem-browser                   # não abre o browser soz
   jurisdição** antes de usar este bot com dinheiro real — varia por país
   (e, nalguns, por região).
 
-## Como o `apostas` decide (lê isto antes de confiar numa sugestão)
+## Como o `apostas` decide (lê isto antes de confiar num palpite)
 
-Para cada jogo:
+Para cada jogo, o relatório mostra sempre um palpite — não é filtrado pela
+odd da casa de apostas:
 
 1. Calcula golos esperados com o modelo de Poisson (mesma base do comando
    `modelo`), com dois ajustes face à média simples da época:
@@ -94,25 +95,26 @@ Para cada jogo:
      jogo de há 60 dias pesa metade de um de hoje). Uma equipa em má fase
      atual não fica escondida atrás de bons resultados de há meses (nem
      o inverso).
-2. Mistura a probabilidade do modelo com a do consenso do mercado
-   (`APOSTAS_PESO_MODELO`, omissão 35% modelo / 65% mercado — o mercado
-   agrega muita mais informação do que este modelo, por isso pesa mais) e
-   compara essa probabilidade final com a **melhor odd real** disponível.
-3. Só sugere apostar no resultado (1X2) se o valor esperado for positivo
-   **e plausível**: valores muito grandes (`APOSTAS_VALOR_SUSPEITO`,
-   omissão 20%) são tratados como sinal de que falta informação ao
-   modelo, não como boa notícia — nesse caso a confiança cai para "baixa"
-   e não é a sugestão principal.
-4. Sem odds de golos (over/under, ambas marcam) para comparar, a sugestão
-   nesses mercados vem com uma **odd mínima**: confirmas tu se a tua casa
-   paga acima disso.
-5. Se nada disto passar o crivo: "sem aposta recomendada" — é uma
-   resposta válida, não uma falha.
+2. O palpite de resultado (1X2) é sempre o lado (casa/empate/fora) com
+   maior probabilidade segundo este modelo — **é a opinião do modelo, não
+   uma comparação de valor com o mercado**. A melhor odd real disponível
+   para esse lado (se existir) aparece só como referência, para saberes a
+   que preço apostar — nunca decide se o palpite aparece.
+3. Se o valor calculado (odd × probabilidade do modelo) for muito grande
+   (`APOSTAS_VALOR_SUSPEITO`, omissão 20%), o relatório avisa que é pouco
+   credível — costuma ser sinal de que falta informação ao modelo (lesões,
+   rotação), não uma oportunidade — mas o palpite continua a aparecer.
+4. Também mostra, como alternativa, a sugestão de golos (over/under 2.5,
+   ambas marcam) quando a confiança do modelo nesse mercado passa um
+   mínimo (`APOSTAS_PROB_MIN_GOLOS`). Sem odds reais desses mercados para
+   comparar, vem com uma **odd mínima**: confirmas tu se a tua casa paga
+   acima disso.
 
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor
-encontrado, porque valores maiores tendem a vir de amostras piores, não de
-oportunidades melhores.
+calculado, porque valores maiores tendem a vir de amostras piores, não de
+oportunidades melhores. Com confiança baixa, o palpite aparece à mesma,
+mas o relatório avisa que o modelo tem pouca base para este jogo.
 
 ### Lesões (link de pesquisa)
 

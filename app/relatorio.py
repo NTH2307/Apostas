@@ -75,11 +75,14 @@ def _pct(p) -> str:
 def _texto_sugestao(analise: AnaliseJogo) -> str:
     s = analise.sugestao
     if s.tipo == "1x2":
-        return f"Stake sugerida: {s.stake:.2f}€ · probabilidade estimada {_pct(s.probabilidade)} · valor {s.valor * 100:.1f}%"
+        base = f"Opinião do modelo · probabilidade estimada {_pct(s.probabilidade)}"
+        if s.odd is not None:
+            return f"Stake sugerida: {s.stake:.2f}€ · {base} · valor vs. odd da casa {s.valor * 100:.1f}%"
+        return f"{base} · sem odd desta casa para calcular stake/valor"
     if s.tipo == "golos":
         return (f"Probabilidade estimada {_pct(s.probabilidade)} — compara com a odd na tua casa; "
                 f"abaixo de {s.odd_minima:.2f} não compensa")
-    return "Mercado e modelo estão alinhados, ou os dados não chegam para uma opinião fiável."
+    return "Dados insuficientes para uma opinião fiável."
 
 
 def _bloco_lesoes(casa: str, fora: str, link_casa: str, link_fora: str) -> str:
@@ -147,15 +150,16 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
     """`resultados`: lista de ResultadoCompeticao (ver app/analise.py)."""
     gerado_em = gerado_em or datetime.now(ZoneInfo(FUSO_PADRAO))
     analises = [a for r in resultados for a in r.analises]
-    com_aposta = sorted((a for a in analises if a.sugestao.tipo != "nenhuma"), key=chave_ordenacao, reverse=True)
+    melhores = sorted(analises, key=chave_ordenacao, reverse=True)
+    confianca_alta = sum(1 for a in analises if a.sugestao.confianca == "alta")
 
     top_html = "".join(
         f"<li><span class='meta'>{escape(_data_extenso(a.inicio.date()) if a.inicio else '')} · "
         f"{a.inicio.strftime('%H:%M') if a.inicio else ''} · {escape(a.competicao)}</span><br>"
         f"<strong>{escape(a.casa)} vs {escape(a.fora)}</strong> → {escape(a.sugestao.texto)}"
         f"<span class='badge'>confiança {escape(a.sugestao.confianca)}</span></li>"
-        for a in com_aposta[:top]
-    ) or "<li>Nenhum jogo com aposta recomendada neste período.</li>"
+        for a in melhores[:top]
+    ) or "<li>Nenhum jogo analisado neste período.</li>"
 
     por_dia = defaultdict(list)
     for a in analises:
@@ -197,16 +201,16 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
   <p class="sub">Jogos de {periodo} · gerado em {gerado_em.strftime('%d/%m/%Y às %H:%M')}</p>
   <div class="resumo">
     <span>{len(analises)} jogos analisados</span>
-    <span>{len(com_aposta)} com aposta sugerida</span>
-    <span>{len(analises) - len(com_aposta)} sem aposta</span>
+    <span>{confianca_alta} com confiança alta</span>
   </div>
-  <h2>As melhores sugestões</h2>
+  <h2>Os palpites mais fortes</h2>
   <div class="top"><ol>{top_html}</ol></div>
   {seccoes}
   {bloco_notas}
   <footer>
-    <p><strong>Como ler isto.</strong> "Aposta" no resultado (verde) compara a probabilidade estimada com a melhor
-    odd real encontrada; "aposta" em golos (azul) diz-te a odd mínima a partir da qual compensa — confirma-a na tua casa.
+    <p><strong>Como ler isto.</strong> O palpite no resultado (verde) é sempre a opinião do modelo — o lado que ele
+    acha mais provável, não uma comparação de valor com a casa de apostas; a odd aparece só como referência, quando
+    existe. "Aposta" em golos (azul) diz-te a odd mínima a partir da qual compensa — confirma-a na tua casa.
     A confiança depende de quantos jogos há na amostra de cada equipa.</p>
     <p>⚠️ Isto é uma leitura estatística, não uma garantia: mesmo as sugestões de confiança alta perdem muitas vezes, e as
     casas de apostas têm mais informação do que este modelo (lesões, onzes, motivação). Aposta só o que estás disposto a

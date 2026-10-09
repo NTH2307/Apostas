@@ -32,7 +32,7 @@ def test_confianca_por_amostra():
     assert confianca_por_amostra(2) == "baixa"
 
 
-def test_sugere_resultado_quando_modelo_e_mercado_apontam_para_valor_plausivel():
+def test_palpite_1x2_e_sempre_o_favorito_do_modelo_com_odd_de_referencia():
     analise = analisar_jogo(_evento(1.62, 3.9, 5.5), _forcas(casa_forte=True, jogos=12), "Liga Teste")
     s = analise.sugestao
     assert s.tipo == "1x2"
@@ -40,36 +40,37 @@ def test_sugere_resultado_quando_modelo_e_mercado_apontam_para_valor_plausivel()
     assert s.odd == 1.62
     assert s.bookmaker == "Casa X"
     assert s.confianca == "alta"
-    assert 0.03 <= s.valor <= 0.20
+    assert s.probabilidade == analise.prob_modelo["casa"]
     assert s.stake > 0
 
 
-def test_poucos_jogos_nao_sugere_aposta_e_avisa():
+def test_poucos_jogos_continua_a_dar_palpite_mas_avisa_confianca_baixa():
     analise = analisar_jogo(_evento(1.62, 3.9, 5.5), _forcas(casa_forte=True, jogos=2), "Liga Teste")
-    assert analise.sugestao.tipo == "nenhuma"
+    assert analise.sugestao.tipo == "1x2"
+    assert analise.sugestao.confianca == "baixa"
     assert any("Poucos jogos" in aviso for aviso in analise.avisos)
 
 
-def test_valor_grande_demais_e_tratado_como_suspeito_e_nao_como_aposta():
-    # o mercado acha a casa azarona, o modelo acha-a muito favorita: não confiar
+def test_valor_grande_demais_continua_a_ser_palpite_mas_avisa_pouco_credivel():
+    # o mercado acha a casa azarona, o modelo acha-a muito favorita: o palpite
+    # aparece à mesma (é a opinião do modelo), mas com aviso de desconfiança
     analise = analisar_jogo(_evento(4.0, 3.6, 1.9), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    assert analise.sugestao.tipo != "1x2"
+    assert analise.sugestao.tipo == "1x2"
+    assert "Casa" in analise.sugestao.texto
     assert any("grande demais" in aviso for aviso in analise.avisos)
-    assert any(a.tipo == "1x2" and a.confianca == "baixa" for a in analise.alternativas)
 
 
-def test_sugestao_de_golos_vem_com_odd_minima_acima_da_odd_justa():
+def test_sugestao_de_golos_aparece_como_alternativa_com_odd_minima_acima_da_odd_justa():
     analise = analisar_jogo(_evento(4.0, 3.6, 1.9), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    s = analise.sugestao
-    assert s.tipo == "golos"
-    assert "Mais de 2.5 golos" in s.texto
-    assert s.odd_minima > 1 / s.probabilidade
-    assert s.confianca == "média"  # sem odds reais de golos, nunca passa de média
+    golos = next(a for a in analise.alternativas if a.tipo == "golos")
+    assert "Mais de 2.5 golos" in golos.texto
+    assert golos.odd_minima > 1 / golos.probabilidade
+    assert golos.confianca == "média"  # sem odds reais de golos, nunca passa de média
 
 
-def test_mercado_alinhado_com_modelo_nao_sugere_nada():
+def test_mercado_alinhado_com_modelo_ainda_assim_da_palpite():
     analise = analisar_jogo(_evento(2.2, 3.4, 3.3), _forcas(casa_forte=False, jogos=12), "Liga Teste")
-    assert analise.sugestao.tipo == "nenhuma"
+    assert analise.sugestao.tipo == "1x2"
 
 
 def test_equipa_desconhecida_devolve_none():
@@ -85,9 +86,10 @@ def test_probabilidade_final_mistura_modelo_e_mercado():
         assert baixo <= analise.prob_final[lado] <= alto
 
 
-def test_ordenacao_poe_apostas_de_resultado_confiantes_primeiro():
-    aposta_1x2 = analisar_jogo(_evento(1.62, 3.9, 5.5), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    aposta_golos = analisar_jogo(_evento(4.0, 3.6, 1.9), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    sem_aposta = analisar_jogo(_evento(2.2, 3.4, 3.3), _forcas(casa_forte=False, jogos=12), "Liga Teste")
-    ordenadas = sorted([sem_aposta, aposta_golos, aposta_1x2], key=chave_ordenacao, reverse=True)
-    assert [a.sugestao.tipo for a in ordenadas] == ["1x2", "golos", "nenhuma"]
+def test_ordenacao_poe_confianca_maior_primeiro_e_depois_valor_maior():
+    confianca_baixa = analisar_jogo(_evento(1.62, 3.9, 5.5), _forcas(casa_forte=True, jogos=2), "Liga Teste")
+    valor_grande = analisar_jogo(_evento(4.0, 3.6, 1.9), _forcas(casa_forte=True, jogos=12), "Liga Teste")
+    valor_moderado = analisar_jogo(_evento(1.62, 3.9, 5.5), _forcas(casa_forte=True, jogos=12), "Liga Teste")
+    ordenadas = sorted([confianca_baixa, valor_grande, valor_moderado], key=chave_ordenacao, reverse=True)
+    assert ordenadas[0] in (valor_grande, valor_moderado)
+    assert ordenadas[-1] is confianca_baixa
