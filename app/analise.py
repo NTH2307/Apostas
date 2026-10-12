@@ -6,7 +6,7 @@ from datetime import date
 
 import config
 from app.arbitrage import filtrar_bookmakers
-from app.odds import buscar_odds, filtrar_por_intervalo, proxima_data_com_jogos
+from app.odds import buscar_odds, filtrar_por_intervalo, jogos_comecados_no_periodo, proxima_data_com_jogos
 from app.recomendacao import AnaliseJogo, analisar_jogo
 from app.stats import buscar_jogos_terminados, calcular_forcas
 
@@ -57,11 +57,19 @@ def analisar_competicao(
     eventos_todos = buscar_odds(desporto)
     eventos = filtrar_por_intervalo(eventos_todos, inicio, fim)
     if not eventos:
-        proxima = proxima_data_com_jogos(eventos_todos)
-        if proxima and proxima > fim:
-            resultado.nota = f"sem jogos neste período — próxima data com jogos: {proxima.strftime('%d/%m/%Y')}"
+        comecados = jogos_comecados_no_periodo(eventos_todos, inicio, fim)
+        if comecados:
+            resultado.nota = (
+                f"havia {len(comecados)} jogo(s) neste período, mas já tinham começado quando o "
+                "relatório foi gerado — o bot só dá palpites pré-jogo; corre o `apostas` mais cedo "
+                "para os veres"
+            )
         else:
-            resultado.nota = "sem jogos agendados neste período"
+            proxima = proxima_data_com_jogos(eventos_todos)
+            if proxima and proxima > fim:
+                resultado.nota = f"sem jogos neste período — próxima data com jogos: {proxima.strftime('%d/%m/%Y')}"
+            else:
+                resultado.nota = "sem jogos agendados neste período"
         return resultado
 
     bookmakers = config.BOOKMAKERS_FIAVEIS if bookmakers is None else bookmakers

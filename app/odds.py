@@ -158,6 +158,22 @@ def filtrar_por_intervalo(
     return filtrados
 
 
+def jogos_comecados_no_periodo(
+    eventos: list[dict], inicio: date, fim: date, fuso: str = FUSO_PADRAO, agora: datetime | None = None,
+) -> list[dict]:
+    """Eventos cuja data (hora de Portugal) cai no intervalo pedido mas que
+    já começaram (o inverso de `filtrar_por_intervalo`). Usa isto para
+    distinguir "não havia jogos agendados" de "havia jogos, mas já tinham
+    começado quando o relatório foi gerado — sem valor pré-jogo"."""
+    agora = agora or datetime.now(ZoneInfo(fuso))
+    comecados = []
+    for evento in eventos:
+        inicio_evento = hora_local(evento, fuso)
+        if inicio_evento and inicio <= inicio_evento.date() <= fim and inicio_evento <= agora:
+            comecados.append(evento)
+    return comecados
+
+
 def proxima_data_com_jogos(eventos: list[dict], fuso: str = FUSO_PADRAO) -> date | None:
     """A data (no fuso indicado, omissão hora de Portugal) do jogo mais
     próximo entre `eventos` — útil para saber "quando é a próxima jornada"
