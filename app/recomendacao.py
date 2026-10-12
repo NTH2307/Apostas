@@ -1,33 +1,28 @@
 """Transforma a análise de um jogo num palpite concreto: o resultado (1X2)
-em que o modelo de golos mais confia, para todos os jogos — não é filtrado
-pela odd da casa de apostas, que só aparece como referência quando existe.
+em que o modelo de golos mais confia, para todos os jogos — sem olhar a
+odds nem a casas de apostas, é só a opinião do modelo.
 
 Como decide:
 1. **Resultado (1X2)**: escolhe sempre o lado (casa/empate/fora) com maior
-   probabilidade segundo o modelo de golos próprio. A melhor odd real
-   disponível para esse lado (se existir) aparece no texto e é usada para
-   calcular a stake — mas nunca decide se o palpite é mostrado.
+   probabilidade segundo o modelo de golos próprio.
 2. **Golos** (mais/menos de 2.5, ambas marcam): aparece como alternativa
    quando a confiança do modelo nesse mercado passa um mínimo
    (APOSTAS_PROB_MIN_GOLOS). Não temos odds destes mercados, por isso vem
-   com a **odd mínima** a partir da qual a aposta tem valor — confirmas tu
-   na tua casa.
+   com a **odd mínima** a partir da qual a aposta teria valor — confirmas
+   tu na tua casa, se quiseres.
 
-⚠️ Isto não é uma previsão garantida — é a opinião do modelo, não uma
-leitura de valor face ao mercado. Mesmo palpites de confiança "alta" perdem
-muitas vezes; a casa de apostas tem normalmente mais informação do que este
-modelo (lesões, onzes, motivação).
+⚠️ Isto não é uma previsão garantida — é a opinião do modelo. Mesmo
+palpites de confiança "alta" perdem muitas vezes; as casas de apostas têm
+normalmente mais informação do que este modelo (lesões, onzes, motivação).
 """
 from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import quote
 
 import config
-from app.arbitrage import melhores_odds_por_resultado, probabilidades_implicitas_justas
 from app.model import encontrar_nome_equivalente
 from app.odds import hora_local
 from app.poisson import golos_esperados, probabilidades
-from app.staking import calcular_stake
 
 LADOS_1X2 = ("casa", "empate", "fora")
 MERCADOS_GOLOS = (
@@ -45,11 +40,7 @@ class Sugestao:
     texto: str
     confianca: str  # "alta", "média" ou "baixa"
     probabilidade: float | None = None
-    odd: float | None = None
-    bookmaker: str | None = None
     odd_minima: float | None = None  # golos: só vale a pena apostar a partir desta odd
-    stake: float | None = None
-    valor: float | None = None
 
 
 @dataclass
@@ -61,8 +52,6 @@ class AnaliseJogo:
     golos_esperados_casa: float
     golos_esperados_fora: float
     prob_modelo: dict
-    prob_mercado: dict
-    prob_final: dict
     prob_golos: dict
     jogos_min: int
     sugestao: Sugestao
@@ -91,46 +80,14 @@ def confianca_por_amostra(jogos_min: int) -> str:
     return "baixa"
 
 
-def _prob_mercado_1x2(evento: dict, casa: str, fora: str) -> dict:
-    justas = probabilidades_implicitas_justas(evento)
-    nomes = {"casa": casa, "empate": "Draw", "fora": fora}
-    if not all(nomes[lado] in justas for lado in LADOS_1X2):
-        return {}
-    return {lado: justas[nomes[lado]] for lado in LADOS_1X2}
-
-
-def _sugestao_1x2(evento, casa, fora, prob_modelo, confianca_base, capital, avisos) -> Sugestao:
+def _sugestao_1x2(casa: str, fora: str, prob_modelo: dict, confianca_base: str) -> Sugestao:
     """Palpite do modelo: o lado (casa/empate/fora) com maior probabilidade
-    segundo o modelo de golos. A odd real (se existir, para esse lado
-    específico) só serve de referência — nunca impede o palpite de aparecer."""
-    nomes = {"casa": casa, "empate": "Draw", "fora": fora}
+    segundo o modelo de golos — opinião do modelo, sem olhar a odds."""
     rotulos = {"casa": f"Vitória do {casa}", "empate": "Empate", "fora": f"Vitória do {fora}"}
-    melhores = {m.resultado: m for m in melhores_odds_por_resultado(evento)}
-
     lado = max(LADOS_1X2, key=lambda l: prob_modelo[l])
-    melhor = melhores.get(nomes[lado])
-
-    if melhor:
-        valor = melhor.odd * prob_modelo[lado] - 1
-        if valor > config.APOSTAS_VALOR_SUSPEITO:
-            avisos.append(
-                f"O valor calculado para '{rotulos[lado]}' ({valor * 100:.0f}%) é grande demais para ser credível — "
-                "costuma querer dizer que o modelo não sabe algo que o mercado sabe (lesões, rotação, etc.)."
-            )
-        return Sugestao(
-            tipo="1x2",
-            texto=f"{rotulos[lado]} @ {melhor.odd} ({melhor.bookmaker})",
-            confianca=confianca_base,
-            probabilidade=prob_modelo[lado],
-            odd=melhor.odd,
-            bookmaker=melhor.bookmaker,
-            stake=calcular_stake(capital, melhor.odd, prob_modelo[lado]),
-            valor=valor,
-        )
-
     return Sugestao(
         tipo="1x2",
-        texto=f"{rotulos[lado]} — sem odd disponível nesta casa para referência",
+        texto=rotulos[lado],
         confianca=confianca_base,
         probabilidade=prob_modelo[lado],
     )
@@ -153,10 +110,9 @@ def _sugestao_golos(prob_golos: dict, confianca_base: str) -> Sugestao | None:
     )
 
 
-def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | None = None) -> AnaliseJogo | None:
+def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | None:
     """Analisa um jogo e escolhe a sugestão principal. Devolve None se
     alguma das equipas não existir nas estatísticas da competição."""
-    capital = config.CAPITAL_INICIAL if capital is None else capital
     casa, fora = evento["equipas"]
     equipas_modelo = forcas.get("equipas", {})
     casa_eq = encontrar_nome_equivalente(casa, equipas_modelo)
@@ -170,15 +126,6 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | 
     confianca_base = confianca_por_amostra(jogos_min)
     avisos = []
 
-    prob_mercado = _prob_mercado_1x2(evento, casa, fora)
-    w = config.APOSTAS_PESO_MODELO
-    prob_final = {
-        lado: (w * prob_modelo[lado] + (1 - w) * prob_mercado[lado]) if prob_mercado else prob_modelo[lado]
-        for lado in LADOS_1X2
-    }
-    if not prob_mercado:
-        avisos.append("Sem odds de 1X2 suficientes para comparar com o mercado — só a opinião do modelo.")
-
     prob_liga = probabilidades(forcas["media_golos_casa"], forcas["media_golos_fora"])
     wg = config.APOSTAS_PESO_MODELO_GOLOS
     prob_golos = {chave: wg * prob_modelo[chave] + (1 - wg) * prob_liga[chave] for chave, _ in MERCADOS_GOLOS}
@@ -188,7 +135,7 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | 
             f"Poucos jogos na amostra ({jogos_min}) para pelo menos uma das equipas — o modelo é pouco fiável aqui."
         )
 
-    principal = _sugestao_1x2(evento, casa, fora, prob_modelo, confianca_base, capital, avisos)
+    principal = _sugestao_1x2(casa, fora, prob_modelo, confianca_base)
     sugestao_golos = _sugestao_golos(prob_golos, confianca_base)
     alternativas = [sugestao_golos] if sugestao_golos else []
 
@@ -200,8 +147,6 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | 
         golos_esperados_casa=lambda_casa,
         golos_esperados_fora=lambda_fora,
         prob_modelo=prob_modelo,
-        prob_mercado=prob_mercado,
-        prob_final=prob_final,
         prob_golos=prob_golos,
         jogos_min=jogos_min,
         sugestao=principal,
@@ -214,10 +159,7 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str, capital: float | 
 
 def chave_ordenacao(analise: AnaliseJogo) -> tuple:
     """Ordena jogos do palpite mais para o menos "forte": primeiro por
-    confiança (amostra maior), depois por valor face à odd (quando há odd)
-    ou pela probabilidade do modelo (quando não há)."""
+    confiança (amostra maior), depois pela probabilidade que o modelo dá
+    ao lado escolhido."""
     s = analise.sugestao
-    return (
-        ORDEM_CONFIANCA.get(s.confianca, 0),
-        s.valor if s.valor is not None else (s.probabilidade or 0),
-    )
+    return (ORDEM_CONFIANCA.get(s.confianca, 0), s.probabilidade or 0)

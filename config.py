@@ -44,20 +44,15 @@ MODELO_PESO_PRIOR = float(os.getenv("MODELO_PESO_PRIOR", 5))
 MODELO_MEIA_VIDA_DIAS = float(os.getenv("MODELO_MEIA_VIDA_DIAS", 60))
 
 # --- Sugestões de aposta (comando `apostas`, ver app/recomendacao.py) ---
-# Peso do modelo vs. consenso do mercado na probabilidade final do 1X2 (0 =
-# só mercado, 1 = só modelo). O mercado agrega muito mais informação do que
-# um modelo de golos, por isso o modelo só "inclina" a opinião do mercado.
-APOSTAS_PESO_MODELO = float(os.getenv("APOSTAS_PESO_MODELO", 0.35))
-# Idem para golos (over/under, ambas marcam), mas contra a média da liga,
-# já que não temos odds desses mercados para comparar.
+# O palpite do 1X2 é sempre o lado favorito do modelo — opinião pura do
+# modelo, nunca comparada com odds nem com casas de apostas.
+# Peso do modelo vs. média da liga na probabilidade de golos (over/under,
+# ambas marcam) — não temos odds desses mercados para comparar.
 APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
-# O palpite do 1X2 é sempre o lado favorito do modelo (não é filtrado pela
-# odd da casa) — isto só controla um aviso: acima deste valor, o "valor"
-# calculado é marcado como pouco credível (normalmente sinal de que falta
-# informação ao modelo), mas o palpite continua a aparecer na mesma.
-APOSTAS_VALOR_SUSPEITO = float(os.getenv("APOSTAS_VALOR_SUSPEITO", 0.20))
 APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # confiança mínima para sugerir um mercado de golos
-APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 1))                            # janela de dias a analisar por omissão (1 = só hoje)
+# Janela de dias a analisar por omissão — alarga para veres sempre vários
+# jogos de várias ligas (a maioria das ligas não joga todos os dias).
+APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 5))
 RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))
 
 # Nota sobre lesões: chegámos a integrar a API-Football, mas o free tier

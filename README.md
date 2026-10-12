@@ -22,23 +22,20 @@ os dias e veres um punhado de jogos, não uma lista interminável. Se hoje
 não houver jogos em nenhuma competição (ex: pausa internacional), o
 relatório diz isso claramente em vez de aparecer vazio sem explicação.
 
-Por cada jogo com uma sugestão, o relatório mostra: a aposta concreta
-("Vitória do Arsenal @ 1.78 na Betfair"), a stake sugerida, a confiança
-(alta/média/baixa, consoante quantos jogos há na amostra de cada equipa),
-um link de pesquisa para lesões/notícias de cada equipa, e os números
-todos por trás (para quem quiser verificar). Jogos sem sugestão aparecem
-como "sem aposta recomendada" — o bot não força uma opinião quando os
-dados não dão para isso.
+Por cada jogo, o relatório mostra sempre o palpite do modelo ("Vitória do
+Arsenal"), a confiança (alta/média/baixa, consoante quantos jogos há na
+amostra de cada equipa), um link de pesquisa para lesões/notícias de cada
+equipa, e os números todos por trás (para quem quiser verificar). Nunca
+olha a odds nem a casas de apostas — é só a opinião do modelo, para todos
+os jogos.
 
 Opções úteis:
 
 ```bash
-python main.py apostas --dias 7                        # alarga a janela (omissão: só hoje)
+python main.py apostas --dias 7                        # alarga a janela (omissão: 5 dias)
 python main.py apostas --amanha                        # só amanhã
 python main.py apostas --dia 2026-10-04                # só um dia específico
 python main.py apostas --competicao PL --desporto soccer_epl  # só uma liga
-python main.py apostas --bookmakers "Betfair,Pinnacle"  # restringe casas (usa `bookmakers` para veres nomes exatos)
-python main.py apostas --capital 50                    # a tua banca, para calcular stakes
 python main.py apostas --sem-browser                   # não abre o browser sozinho
 ```
 
@@ -81,8 +78,8 @@ python main.py apostas --sem-browser                   # não abre o browser soz
 
 ## Como o `apostas` decide (lê isto antes de confiar num palpite)
 
-Para cada jogo, o relatório mostra sempre um palpite — não é filtrado pela
-odd da casa de apostas:
+Para cada jogo, o relatório mostra sempre o palpite do modelo — nunca olha
+a odds nem a casas de apostas:
 
 1. Calcula golos esperados com o modelo de Poisson (mesma base do comando
    `modelo`), com dois ajustes face à média simples da época:
@@ -96,19 +93,14 @@ odd da casa de apostas:
      atual não fica escondida atrás de bons resultados de há meses (nem
      o inverso).
 2. O palpite de resultado (1X2) é sempre o lado (casa/empate/fora) com
-   maior probabilidade segundo este modelo — **é a opinião do modelo, não
-   uma comparação de valor com o mercado**. A melhor odd real disponível
-   para esse lado (se existir) aparece só como referência, para saberes a
-   que preço apostar — nunca decide se o palpite aparece.
-3. Se o valor calculado (odd × probabilidade do modelo) for muito grande
-   (`APOSTAS_VALOR_SUSPEITO`, omissão 20%), o relatório avisa que é pouco
-   credível — costuma ser sinal de que falta informação ao modelo (lesões,
-   rotação), não uma oportunidade — mas o palpite continua a aparecer.
-4. Também mostra, como alternativa, a sugestão de golos (over/under 2.5,
+   maior probabilidade segundo este modelo — **é só a opinião do modelo**,
+   sem comparação nenhuma com odds ou mercado.
+3. Também mostra, como alternativa, a sugestão de golos (over/under 2.5,
    ambas marcam) quando a confiança do modelo nesse mercado passa um
    mínimo (`APOSTAS_PROB_MIN_GOLOS`). Sem odds reais desses mercados para
-   comparar, vem com uma **odd mínima**: confirmas tu se a tua casa paga
-   acima disso.
+   comparar, vem com uma **odd mínima** só informativa: se quiseres
+   confirmar na tua casa se compensa, essa é a referência — não faz parte
+   do palpite em si.
 
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor

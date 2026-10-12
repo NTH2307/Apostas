@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import config
-from app.arbitrage import filtrar_bookmakers
 from app.odds import buscar_odds, filtrar_por_intervalo, jogos_comecados_no_periodo, proxima_data_com_jogos
 from app.recomendacao import AnaliseJogo, analisar_jogo
 from app.stats import buscar_jogos_terminados, calcular_forcas
@@ -41,9 +40,7 @@ def analisar_competicao(
     desporto: str,
     inicio: date,
     fim: date,
-    bookmakers: list | None = None,
     jogos_historico: int | None = None,
-    capital: float | None = None,
 ) -> ResultadoCompeticao:
     nome = NOMES_COMPETICOES.get(competicao, competicao)
     resultado = ResultadoCompeticao(codigo=competicao, nome=nome)
@@ -72,9 +69,8 @@ def analisar_competicao(
                 resultado.nota = "sem jogos agendados neste período"
         return resultado
 
-    bookmakers = config.BOOKMAKERS_FIAVEIS if bookmakers is None else bookmakers
     for evento in eventos:
-        analise: AnaliseJogo | None = analisar_jogo(filtrar_bookmakers(evento, bookmakers), forcas, nome, capital)
+        analise: AnaliseJogo | None = analisar_jogo(evento, forcas, nome)
         if analise is None:
             resultado.sem_dados.append(" vs ".join(evento["equipas"]))
         else:

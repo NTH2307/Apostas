@@ -75,10 +75,7 @@ def _pct(p) -> str:
 def _texto_sugestao(analise: AnaliseJogo) -> str:
     s = analise.sugestao
     if s.tipo == "1x2":
-        base = f"Opinião do modelo · probabilidade estimada {_pct(s.probabilidade)}"
-        if s.odd is not None:
-            return f"Stake sugerida: {s.stake:.2f}€ · {base} · valor vs. odd da casa {s.valor * 100:.1f}%"
-        return f"{base} · sem odd desta casa para calcular stake/valor"
+        return f"Opinião do modelo · probabilidade estimada {_pct(s.probabilidade)}"
     if s.tipo == "golos":
         return (f"Probabilidade estimada {_pct(s.probabilidade)} — compara com a odd na tua casa; "
                 f"abaixo de {s.odd_minima:.2f} não compensa")
@@ -110,8 +107,7 @@ def _card(analise: AnaliseJogo) -> str:
     lesoes = _bloco_lesoes(analise.casa, analise.fora, analise.link_lesoes_casa, analise.link_lesoes_fora)
 
     linhas_1x2 = "".join(
-        f"<tr><td>{escape(rotulo)}</td><td>{_pct(analise.prob_modelo[lado])}</td>"
-        f"<td>{_pct(analise.prob_mercado.get(lado))}</td><td><strong>{_pct(analise.prob_final[lado])}</strong></td></tr>"
+        f"<tr><td>{escape(rotulo)}</td><td><strong>{_pct(analise.prob_modelo[lado])}</strong></td></tr>"
         for lado, rotulo in (("casa", analise.casa), ("empate", "Empate"), ("fora", analise.fora))
     )
     linhas_golos = "".join(
@@ -135,7 +131,7 @@ def _card(analise: AnaliseJogo) -> str:
     <p class="meta">Golos esperados (modelo): {analise.golos_esperados_casa:.2f} – {analise.golos_esperados_fora:.2f}
       · jogos na amostra da equipa com menos dados: {analise.jogos_min}</p>
     <table>
-      <tr><th>Resultado</th><th>Modelo</th><th>Mercado</th><th>Final</th></tr>
+      <tr><th>Resultado</th><th>Probabilidade (modelo)</th></tr>
       {linhas_1x2}
     </table>
     <table>
@@ -209,8 +205,8 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
   {bloco_notas}
   <footer>
     <p><strong>Como ler isto.</strong> O palpite no resultado (verde) é sempre a opinião do modelo — o lado que ele
-    acha mais provável, não uma comparação de valor com a casa de apostas; a odd aparece só como referência, quando
-    existe. "Aposta" em golos (azul) diz-te a odd mínima a partir da qual compensa — confirma-a na tua casa.
+    acha mais provável, sem olhar a odds nem a casas de apostas. "Aposta" em golos (azul) diz-te a odd mínima a
+    partir da qual compensaria, se quiseres confirmar na tua casa — é só informativo, não faz parte do palpite.
     A confiança depende de quantos jogos há na amostra de cada equipa.</p>
     <p>⚠️ Isto é uma leitura estatística, não uma garantia: mesmo as sugestões de confiança alta perdem muitas vezes, e as
     casas de apostas têm mais informação do que este modelo (lesões, onzes, motivação). Aposta só o que estás disposto a

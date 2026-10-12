@@ -249,9 +249,8 @@ def _intervalo_datas(args) -> tuple[date, date]:
 def _linha_sugestao(analise) -> str:
     s = analise.sugestao
     quando = analise.inicio.strftime("%d/%m %H:%M") if analise.inicio else "—"
-    extra = f" · stake {s.stake:.2f}€" if s.tipo == "1x2" and s.stake else ""
     return (f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n"
-            f"   🎯 {s.texto}{extra} · confiança {s.confianca}")
+            f"   🎯 {s.texto} · confiança {s.confianca}")
 
 
 def cmd_apostas(args):
@@ -264,7 +263,6 @@ def cmd_apostas(args):
         pares = config.COMPETICOES_MODELO
 
     inicio, fim = _intervalo_datas(args)
-    bookmakers = args.bookmakers.split(",") if args.bookmakers else None
     print(f"A analisar {len(pares)} competição(ões), jogos de {inicio.strftime('%d/%m')} a {fim.strftime('%d/%m')}...")
 
     resultados = []
@@ -273,8 +271,7 @@ def cmd_apostas(args):
             time.sleep(7)  # free tier da football-data.org: 10 pedidos/minuto
         try:
             resultado = analisar_competicao(
-                competicao, desporto, inicio, fim, bookmakers=bookmakers,
-                jogos_historico=args.jogos_historico, capital=args.capital,
+                competicao, desporto, inicio, fim, jogos_historico=args.jogos_historico,
             )
         except Exception as e:
             print(f"  {competicao}: erro — {e}")
@@ -403,9 +400,6 @@ def main():
                            help=f"quantos dias a partir de hoje analisar (omissão: {config.APOSTAS_DIAS})")
     p_apostas.add_argument("--amanha", action="store_true", help="só jogos de amanhã")
     p_apostas.add_argument("--dia", help="só jogos deste dia, formato AAAA-MM-DD")
-    p_apostas.add_argument("--bookmakers", help="só estas casas, separadas por vírgula (omissão: BOOKMAKERS_FIAVEIS no .env)")
-    p_apostas.add_argument("--capital", type=float, default=config.CAPITAL_INICIAL,
-                           help="banca total, para calcular a stake sugerida (omissão: CAPITAL_INICIAL no .env)")
     p_apostas.add_argument("--top", type=int, default=10, help="quantas sugestões mostrar no topo (omissão: 10)")
     p_apostas.add_argument("--jogos-historico", type=int, default=config.MODELO_JOGOS_HISTORICO)
     p_apostas.add_argument("--saida", help="onde gravar o relatório HTML (omissão: RELATORIO_PATH, relatorio_apostas.html)")
