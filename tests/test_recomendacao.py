@@ -71,7 +71,11 @@ def test_amostra_quase_zero_diz_dados_insuficientes_e_nao_mostra_alternativas():
     # (equipa média) — a opinião tem de dizer isso claramente, não fingir
     # um palpite específico com alternativas que seriam só ruído
     analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=1), "Liga Teste")
-    assert "dados insuficientes" in analise.sugestao.texto.lower()
+    assert analise.sugestao.tipo == "insuficiente"
+    assert "dados suficientes" in analise.sugestao.texto.lower()
+    # não aponta nenhuma equipa como favorita — seria só a vantagem de
+    # jogar em casa, não uma opinião real sobre estas equipas
+    assert "Casa" not in analise.sugestao.texto and "Fora" not in analise.sugestao.texto
     assert analise.alternativas == []
     assert any("não há dados reais suficientes" in aviso for aviso in analise.avisos)
 

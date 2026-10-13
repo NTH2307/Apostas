@@ -183,17 +183,28 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
             f"Poucos jogos na amostra ({jogos_min}) para pelo menos uma das equipas — o modelo é pouco fiável aqui."
         )
 
-    candidatos = [_candidato_1x2(casa, fora, prob_modelo, prob_liga)]
-    for limiar in LIMIARES_GOLOS:
-        candidatos.append(_candidato_over_under(limiar, prob_golos[f"over_{limiar}"], desvio_over[limiar]))
-    candidatos.append(_candidato_btts(prob_golos["btts_sim"], abs(prob_modelo["btts_sim"] - prob_liga["btts_sim"])))
-    candidatos.sort(key=lambda c: c[1], reverse=True)
-
-    principal = _com_confianca(candidatos[0][0], confianca_base)
     if dados_insuficientes:
-        principal.texto += " — dados insuficientes esta temporada"
+        # Amostra quase nula: as forças de ambas as equipas ficam quase só
+        # no prior, por isso qualquer favorito que se aponte vem só da
+        # vantagem de jogar em casa — não é uma opinião real sobre estas
+        # equipas (pode "favorecer" uma equipa pequena contra um gigante só
+        # por jogar em casa). Mais honesto não apontar favorito nenhum.
+        principal = Sugestao(
+            tipo="insuficiente",
+            texto="Sem dados suficientes esta temporada para dar uma opinião fiável sobre este jogo",
+            confianca="baixa",
+        )
         alternativas = []
     else:
+        candidatos = [_candidato_1x2(casa, fora, prob_modelo, prob_liga)]
+        for limiar in LIMIARES_GOLOS:
+            candidatos.append(_candidato_over_under(limiar, prob_golos[f"over_{limiar}"], desvio_over[limiar]))
+        candidatos.append(
+            _candidato_btts(prob_golos["btts_sim"], abs(prob_modelo["btts_sim"] - prob_liga["btts_sim"]))
+        )
+        candidatos.sort(key=lambda c: c[1], reverse=True)
+
+        principal = _com_confianca(candidatos[0][0], confianca_base)
         alternativas = [
             _com_confianca(sugestao, confianca_base)
             for sugestao, desvio in candidatos[1:]

@@ -114,10 +114,12 @@ de dados (provavelmente paga).
 **Amostra quase zero (ex: início de uma Liga dos Campeões).** Com menos
 de `AMOSTRA_MINIMA_FIAVEL` (3) jogos na época para alguma das equipas, as
 forças de ataque/defesa ficam quase só no prior (equipa média) — não há
-dados reais para distinguir as equipas, e qualquer jogo nestas condições
-dá praticamente o mesmo resultado. Em vez de fingir um palpite específico
-nessas condições, o texto diz "dados insuficientes esta temporada" e não
-mostra alternativas (seriam só ruído).
+dados reais para distinguir as equipas. Favorecer uma delas nestas
+condições viria só da vantagem de jogar em casa, podendo "favorecer" uma
+equipa pequena contra um gigante só por isso (ex: Viking FK a ganhar ao
+Bayern Munique). Por isso, nestas condições, **não aponta equipa
+nenhuma como favorita** — diz claramente que não há dados suficientes, e
+não mostra alternativas (seriam só ruído).
 
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor

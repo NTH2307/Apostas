@@ -250,9 +250,11 @@ def _linha_sugestao(analise) -> str:
     s = analise.sugestao
     pm = analise.prob_modelo
     quando = analise.inicio.strftime("%d/%m %H:%M") if analise.inicio else "—"
-    linha = (f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n"
-             f"   🎯 {s.texto} · confiança {s.confianca} "
-             f"({analise.casa} {pm['casa']*100:.0f}% · empate {pm['empate']*100:.0f}% · {analise.fora} {pm['fora']*100:.0f}%)")
+    prefixo = "⛔" if s.tipo == "insuficiente" else "🎯"
+    linha = f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n   {prefixo} {s.texto}"
+    if s.tipo != "insuficiente":
+        linha += (f" · confiança {s.confianca} "
+                  f"({analise.casa} {pm['casa']*100:.0f}% · empate {pm['empate']*100:.0f}% · {analise.fora} {pm['fora']*100:.0f}%)")
     for alt in analise.alternativas:
         linha += f"\n   ⚽ {alt.texto} · confiança {alt.confianca}"
     return linha

@@ -97,9 +97,10 @@ def _bloco_lesoes(casa: str, fora: str, link_casa: str, link_fora: str) -> str:
 def _card(analise: AnaliseJogo) -> str:
     s = analise.sugestao
     hora = analise.inicio.strftime("%H:%M") if analise.inicio else "—"
+    sem_opiniao = s.tipo in ("nenhuma", "insuficiente")
     classe = {"1x2": "x1x2", "golos": "golos"}.get(s.tipo, "nenhuma")
-    prefixo = "🎯 Aposta: " if s.tipo != "nenhuma" else "⛔ "
-    badge = f'<span class="badge">confiança {escape(s.confianca)}</span>' if s.tipo != "nenhuma" else ""
+    prefixo = "⛔ " if sem_opiniao else "🎯 Aposta: "
+    badge = "" if sem_opiniao else f'<span class="badge">confiança {escape(s.confianca)}</span>'
 
     alternativas = "".join(
         f'<div class="alt">Alternativa: {escape(a.texto)} <span class="badge">confiança {escape(a.confianca)}</span></div>'
