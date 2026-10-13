@@ -66,16 +66,16 @@ def test_poucos_jogos_continua_a_dar_opiniao_mas_avisa_confianca_baixa():
     assert any("Poucos jogos" in aviso for aviso in analise.avisos)
 
 
-def test_amostra_quase_zero_diz_dados_insuficientes_e_nao_mostra_alternativas():
+def test_amostra_quase_zero_continua_a_dar_palpite_mas_avisa_que_e_so_vantagem_de_casa():
     # jogos=1: a amostra é tão pequena que as forças ficam quase só no prior
-    # (equipa média) — a opinião tem de dizer isso claramente, não fingir
-    # um palpite específico com alternativas que seriam só ruído
+    # (equipa média) — continua a dar uma opinião (nunca "sem aposta"), mas
+    # diz claramente que é só pela vantagem de jogar em casa, não uma
+    # leitura real destas equipas, e não mostra alternativas (seriam ruído)
     analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=1), "Liga Teste")
-    assert analise.sugestao.tipo == "insuficiente"
-    assert "dados suficientes" in analise.sugestao.texto.lower()
-    # não aponta nenhuma equipa como favorita — seria só a vantagem de
-    # jogar em casa, não uma opinião real sobre estas equipas
-    assert "Casa" not in analise.sugestao.texto and "Fora" not in analise.sugestao.texto
+    assert analise.sugestao.tipo == "1x2"
+    assert "Casa" in analise.sugestao.texto
+    assert "vantagem de jogar em casa" in analise.sugestao.texto.lower()
+    assert analise.sugestao.confianca == "baixa"
     assert analise.alternativas == []
     assert any("não há dados reais suficientes" in aviso for aviso in analise.avisos)
 

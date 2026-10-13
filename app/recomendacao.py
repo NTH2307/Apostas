@@ -39,9 +39,9 @@ LIMIARES_GOLOS = (1.5, 2.5, 3.5)
 ORDEM_CONFIANCA = {"alta": 2, "média": 1, "baixa": 0}
 # Com menos jogos do que isto na amostra, as forças de ataque/defesa são
 # quase só o prior (equipa média) — o modelo não tem dados reais para
-# distinguir as equipas, por isso qualquer jogo nestas condições dá
-# praticamente o mesmo resultado. Em vez de fingir um palpite específico,
-# diz isso claramente e não mostra alternativas (seriam só ruído).
+# distinguir as equipas. Continua a dar uma opinião (nunca "sem aposta"),
+# mas diz claramente que é só pela vantagem de jogar em casa, não uma
+# leitura real da equipa, e não mostra alternativas (seriam só ruído).
 AMOSTRA_MINIMA_FIAVEL = 3
 
 
@@ -185,14 +185,16 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
 
     if dados_insuficientes:
         # Amostra quase nula: as forças de ambas as equipas ficam quase só
-        # no prior, por isso qualquer favorito que se aponte vem só da
-        # vantagem de jogar em casa — não é uma opinião real sobre estas
-        # equipas (pode "favorecer" uma equipa pequena contra um gigante só
-        # por jogar em casa). Mais honesto não apontar favorito nenhum.
+        # no prior, por isso o único motivo para "casa" aparecer à frente é
+        # a vantagem de jogar em casa — não é uma leitura real destas
+        # equipas. Mesmo assim mostra sempre uma opinião (nunca "sem
+        # aposta"), mas diz isso claramente em vez de parecer uma leitura
+        # específica sobre a equipa.
         principal = Sugestao(
-            tipo="insuficiente",
-            texto="Sem dados suficientes esta temporada para dar uma opinião fiável sobre este jogo",
+            tipo="1x2",
+            texto=f"Vitória do {casa} — só pela vantagem de jogar em casa, sem dados reais desta equipa esta temporada",
             confianca="baixa",
+            probabilidade=prob_modelo["casa"],
         )
         alternativas = []
     else:
