@@ -47,9 +47,9 @@ MODELO_MEIA_VIDA_DIAS = float(os.getenv("MODELO_MEIA_VIDA_DIAS", 60))
 # O palpite do 1X2 é sempre o lado favorito do modelo — opinião pura do
 # modelo, nunca comparada com odds nem com casas de apostas.
 # Peso do modelo vs. média da liga na probabilidade de golos (over/under,
-# ambas marcam) — não temos odds desses mercados para comparar.
+# ambas marcam) — não temos odds desses mercados para comparar. Estas duas
+# opiniões aparecem sempre, tal como o 1X2 — nunca são escondidas.
 APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
-APOSTAS_PROB_MIN_GOLOS = float(os.getenv("APOSTAS_PROB_MIN_GOLOS", 0.60))   # confiança mínima para sugerir um mercado de golos
 # Janela de dias a analisar por omissão — alarga para veres sempre vários
 # jogos de várias ligas (a maioria das ligas não joga todos os dias).
 APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 5))

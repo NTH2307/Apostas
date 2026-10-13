@@ -95,12 +95,12 @@ a odds nem a casas de apostas:
 2. O palpite de resultado (1X2) é sempre o lado (casa/empate/fora) com
    maior probabilidade segundo este modelo — **é só a opinião do modelo**,
    sem comparação nenhuma com odds ou mercado.
-3. Também mostra, como alternativa, a sugestão de golos (over/under 2.5,
-   ambas marcam) quando a confiança do modelo nesse mercado passa um
-   mínimo (`APOSTAS_PROB_MIN_GOLOS`). Sem odds reais desses mercados para
-   comparar, vem com uma **odd mínima** só informativa: se quiseres
-   confirmar na tua casa se compensa, essa é a referência — não faz parte
-   do palpite em si.
+3. Mostra sempre, também, a opinião em dois mercados de golos — nunca só
+   um, e nunca escondidos: **mais ou menos de 2.5 golos**, e **ambas
+   marcam, sim ou não** (o lado mais provável de cada um). Sem odds reais
+   desses mercados para comparar, vêm com uma **odd mínima** só
+   informativa: se quiseres confirmar na tua casa se compensa, essa é a
+   referência — não faz parte do palpite em si.
 
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor

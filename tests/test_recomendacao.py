@@ -44,12 +44,16 @@ def test_poucos_jogos_continua_a_dar_palpite_mas_avisa_confianca_baixa():
     assert any("Poucos jogos" in aviso for aviso in analise.avisos)
 
 
-def test_sugestao_de_golos_aparece_como_alternativa_com_odd_minima_acima_da_odd_justa():
+def test_mostra_sempre_as_duas_opinioes_de_golos_over_under_e_btts():
     analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    golos = next(a for a in analise.alternativas if a.tipo == "golos")
-    assert "Mais de 2.5 golos" in golos.texto
-    assert golos.odd_minima > 1 / golos.probabilidade
-    assert golos.confianca == "média"  # sem odds reais de golos, nunca passa de média
+    assert len(analise.alternativas) == 2
+    textos = [a.texto for a in analise.alternativas]
+    assert any("golos" in t.lower() for t in textos)
+    assert any("ambas marcam" in t.lower() for t in textos)
+    for golos in analise.alternativas:
+        assert golos.tipo == "golos"
+        assert golos.odd_minima > 1 / golos.probabilidade
+        assert golos.confianca == "média"  # sem odds reais de golos, nunca passa de média
 
 
 def test_equipa_desconhecida_devolve_none():
