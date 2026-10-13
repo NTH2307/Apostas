@@ -37,6 +37,12 @@ from app.poisson import golos_esperados, probabilidade_over, probabilidades
 LADOS_1X2 = ("casa", "empate", "fora")
 LIMIARES_GOLOS = (1.5, 2.5, 3.5)
 ORDEM_CONFIANCA = {"alta": 2, "média": 1, "baixa": 0}
+# Com menos jogos do que isto na amostra, as forças de ataque/defesa são
+# quase só o prior (equipa média) — o modelo não tem dados reais para
+# distinguir as equipas, por isso qualquer jogo nestas condições dá
+# praticamente o mesmo resultado. Em vez de fingir um palpite específico,
+# diz isso claramente e não mostra alternativas (seriam só ruído).
+AMOSTRA_MINIMA_FIAVEL = 3
 
 
 @dataclass
@@ -165,7 +171,14 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
         prob_golos[f"over_{limiar}"] = wg * p_modelo_over + (1 - wg) * p_liga_over
         desvio_over[limiar] = abs(p_modelo_over - p_liga_over)
 
-    if confianca_base == "baixa":
+    dados_insuficientes = jogos_min < AMOSTRA_MINIMA_FIAVEL
+    if dados_insuficientes:
+        avisos.append(
+            f"Só {jogos_min} jogo(s) de amostra esta temporada para pelo menos uma das equipas — não há dados "
+            "reais suficientes para as distinguir; os números abaixo são quase só a média da liga, não uma "
+            "leitura destas equipas em concreto."
+        )
+    elif confianca_base == "baixa":
         avisos.append(
             f"Poucos jogos na amostra ({jogos_min}) para pelo menos uma das equipas — o modelo é pouco fiável aqui."
         )
@@ -177,11 +190,15 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
     candidatos.sort(key=lambda c: c[1], reverse=True)
 
     principal = _com_confianca(candidatos[0][0], confianca_base)
-    alternativas = [
-        _com_confianca(sugestao, confianca_base)
-        for sugestao, desvio in candidatos[1:]
-        if desvio >= config.APOSTAS_DESVIO_EXTRA
-    ]
+    if dados_insuficientes:
+        principal.texto += " — dados insuficientes esta temporada"
+        alternativas = []
+    else:
+        alternativas = [
+            _com_confianca(sugestao, confianca_base)
+            for sugestao, desvio in candidatos[1:]
+            if desvio >= config.APOSTAS_DESVIO_EXTRA
+        ]
 
     return AnaliseJogo(
         competicao=competicao,

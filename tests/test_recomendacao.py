@@ -61,9 +61,19 @@ def test_opiniao_principal_pode_ser_golos_quando_e_o_mercado_mais_fora_do_normal
 
 
 def test_poucos_jogos_continua_a_dar_opiniao_mas_avisa_confianca_baixa():
-    analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=2), "Liga Teste")
+    analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=4), "Liga Teste")
     assert analise.sugestao.confianca == "baixa"
     assert any("Poucos jogos" in aviso for aviso in analise.avisos)
+
+
+def test_amostra_quase_zero_diz_dados_insuficientes_e_nao_mostra_alternativas():
+    # jogos=1: a amostra é tão pequena que as forças ficam quase só no prior
+    # (equipa média) — a opinião tem de dizer isso claramente, não fingir
+    # um palpite específico com alternativas que seriam só ruído
+    analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=1), "Liga Teste")
+    assert "dados insuficientes" in analise.sugestao.texto.lower()
+    assert analise.alternativas == []
+    assert any("não há dados reais suficientes" in aviso for aviso in analise.avisos)
 
 
 def test_equipa_desconhecida_devolve_none():

@@ -111,6 +111,14 @@ marcador individual não entram** — não há dados fiáveis e gratuitos para
 os calcular; dava para adicionar no futuro, mas precisaria de outra fonte
 de dados (provavelmente paga).
 
+**Amostra quase zero (ex: início de uma Liga dos Campeões).** Com menos
+de `AMOSTRA_MINIMA_FIAVEL` (3) jogos na época para alguma das equipas, as
+forças de ataque/defesa ficam quase só no prior (equipa média) — não há
+dados reais para distinguir as equipas, e qualquer jogo nestas condições
+dá praticamente o mesmo resultado. Em vez de fingir um palpite específico
+nessas condições, o texto diz "dados insuficientes esta temporada" e não
+mostra alternativas (seriam só ruído).
+
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor
 calculado, porque valores maiores tendem a vir de amostras piores, não de
