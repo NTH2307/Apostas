@@ -58,9 +58,9 @@ APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
 # para aparecer como opinião extra no mesmo jogo, além da principal —
 # nunca um número fixo de opiniões por jogo.
 APOSTAS_DESVIO_EXTRA = float(os.getenv("APOSTAS_DESVIO_EXTRA", 0.10))
-# Janela de dias a analisar por omissão — alarga para veres sempre vários
-# jogos de várias ligas (a maioria das ligas não joga todos os dias).
-APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 5))
+# Janela de dias a analisar por omissão — só hoje. Usa --dias N na linha
+# de comandos se quiseres alargar numa execução específica.
+APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 1))
 RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file__), "relatorio_apostas.html"))
 
 # Nota sobre lesões: chegámos a integrar a API-Football, mas o free tier

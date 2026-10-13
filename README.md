@@ -32,7 +32,7 @@ os jogos.
 Opções úteis:
 
 ```bash
-python main.py apostas --dias 7                        # alarga a janela (omissão: 5 dias)
+python main.py apostas --dias 7                        # alarga a janela (omissão: só hoje)
 python main.py apostas --amanha                        # só amanhã
 python main.py apostas --dia 2026-10-04                # só um dia específico
 python main.py apostas --competicao PL --desporto soccer_epl  # só uma liga
