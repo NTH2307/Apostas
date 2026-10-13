@@ -46,16 +46,18 @@ MODELO_MEIA_VIDA_DIAS = float(os.getenv("MODELO_MEIA_VIDA_DIAS", 60))
 # --- Sugestões de aposta (comando `apostas`, ver app/recomendacao.py) ---
 # Para cada jogo, o modelo olha a vários mercados (1X2, mais/menos de
 # 1.5/2.5/3.5 golos, ambas marcam) e mostra como opinião principal aquele
-# em que está mais decisivo — não é sempre o mesmo tipo. Opiniões nunca
-# comparadas com odds nem casas de apostas.
+# em que ESTE JOGO mais se desvia do normal para a liga — não é sempre o
+# mesmo tipo (escolher sempre o mercado com probabilidade mais alta daria
+# quase sempre "mais de 1.5 golos", que é fácil em qualquer jogo, não só
+# neste). Opiniões nunca comparadas com odds nem casas de apostas.
 # Peso do modelo vs. média da liga na probabilidade de golos — não temos
 # odds desses mercados para comparar.
 APOSTAS_PESO_MODELO_GOLOS = float(os.getenv("APOSTAS_PESO_MODELO_GOLOS", 0.6))
-# Acima desta margem (diferença entre o lado escolhido e a alternativa,
-# 0 a 1), um mercado é decisivo o suficiente para aparecer como opinião
-# extra no mesmo jogo, além da principal — nunca um número fixo de
-# opiniões por jogo.
-APOSTAS_MARGEM_EXTRA = float(os.getenv("APOSTAS_MARGEM_EXTRA", 0.25))
+# Acima deste desvio (diferença entre a probabilidade deste jogo e a
+# média da liga nesse mercado, 0 a 1), um mercado destaca-se o suficiente
+# para aparecer como opinião extra no mesmo jogo, além da principal —
+# nunca um número fixo de opiniões por jogo.
+APOSTAS_DESVIO_EXTRA = float(os.getenv("APOSTAS_DESVIO_EXTRA", 0.10))
 # Janela de dias a analisar por omissão — alarga para veres sempre vários
 # jogos de várias ligas (a maioria das ligas não joga todos os dias).
 APOSTAS_DIAS = int(os.getenv("APOSTAS_DIAS", 5))

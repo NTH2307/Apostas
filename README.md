@@ -94,14 +94,15 @@ a odds nem a casas de apostas:
      o inverso).
 2. Olha a **vários mercados possíveis** para o mesmo jogo: resultado
    (1X2), mais/menos de 1.5/2.5/3.5 golos, e ambas marcam — em cada um,
-   o lado mais provável segundo o modelo.
-3. Mostra como **opinião principal** o mercado em que o modelo está mais
-   decisivo (maior margem entre o lado escolhido e a alternativa) — **não
-   é sempre o resultado**, pode ser qualquer um destes mercados,
-   dependendo do jogo. Quando mais do que um mercado é claramente
-   decisivo para o mesmo jogo, mostra mais do que uma opinião
-   (`APOSTAS_MARGEM_EXTRA`) — nunca um número fixo, é o que o modelo
-   achar que vale a pena para aquele jogo em concreto.
+   o lado mais provável segundo o modelo, e o quanto esse jogo se desvia
+   do que é normal para a liga nesse mercado (ex: a média da liga já diz
+   que "mais de 1.5 golos" é provável em quase todos os jogos — só
+   conta quando ESTE jogo está visivelmente acima ou abaixo disso).
+3. Mostra como **opinião principal** o mercado em que este jogo mais se
+   desvia do normal — **não é sempre o resultado**, pode ser qualquer um
+   destes mercados, dependendo do jogo. Quando mais do que um mercado se
+   destaca claramente do normal para o mesmo jogo, mostra mais do que
+   uma opinião (`APOSTAS_DESVIO_EXTRA`) — nunca um número fixo.
 
 Sem odds reais dos mercados de golos para comparar, vêm com uma **odd
 mínima** só informativa: se quiseres confirmar na tua casa se compensa,

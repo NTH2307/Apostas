@@ -2,13 +2,18 @@
 odds nem a casas de apostas, é só a opinião do modelo.
 
 Para cada jogo, o modelo olha para **vários mercados possíveis**
-(resultado 1X2, mais/menos de 1.5/2.5/3.5 golos, ambas marcam) e escolhe
-o lado mais provável em cada um. Depois mostra como opinião principal
-aquele em que está **mais decisivo** (maior margem entre o lado escolhido
-e a alternativa) — não é sempre o resultado, pode ser qualquer um destes
-mercados, dependendo do jogo. Quando mais do que um mercado é claramente
-decisivo para o mesmo jogo, mostra os dois (ou mais) como opiniões — nunca
-um número fixo, é o que o modelo achar que vale a pena para aquele jogo.
+(resultado 1X2, mais/menos de 1.5/2.5/3.5 golos, ambas marcam). Em vez de
+escolher o mercado com a probabilidade mais alta — isso daria quase
+sempre "mais de 1.5 golos", porque é um mercado estruturalmente fácil em
+qualquer jogo de futebol, não porque o modelo saiba algo especial sobre
+este jogo em concreto — escolhe o mercado em que **este jogo mais se
+desvia do normal para a liga**. Um jogo entre duas equipas muito
+defensivas pode ter um "menos de 2.5 golos" muito mais decisivo do que o
+normal; um jogo entre uma equipa muito mais forte do que a outra pode ter
+o 1X2 muito mais decisivo do que o normal — e é isso que aparece como
+opinião principal. Quando mais do que um mercado se destaca claramente do
+normal para o mesmo jogo, mostra mais do que uma opinião
+(`APOSTAS_DESVIO_EXTRA`) — nunca um número fixo.
 
 Para os mercados de golos não temos odds reais para comparar, por isso
 vêm com uma **odd mínima** só informativa — confirmas tu na tua casa, se
@@ -85,38 +90,38 @@ def _odd_minima(prob: float) -> float:
     return round(1 / prob * 1.05, 2)
 
 
-def _candidato_1x2(casa: str, fora: str, prob_modelo: dict) -> tuple:
-    """(Sugestao, margem) — margem = diferença entre o lado escolhido e o
-    segundo mais provável, usada para comparar com outros mercados."""
+def _candidato_1x2(casa: str, fora: str, prob_modelo: dict, prob_liga: dict) -> tuple:
+    """(Sugestao, desvio) — desvio = o quanto este jogo se afasta do que é
+    normal para a liga nesse lado, usado para comparar com outros
+    mercados e decidir qual mostrar como opinião."""
     rotulos = {"casa": f"Vitória do {casa}", "empate": "Empate", "fora": f"Vitória do {fora}"}
-    ordenado = sorted(LADOS_1X2, key=lambda l: prob_modelo[l], reverse=True)
-    lado, segundo = ordenado[0], ordenado[1]
+    lado = max(LADOS_1X2, key=lambda l: prob_modelo[l])
     sugestao = Sugestao(tipo="1x2", texto=rotulos[lado], confianca="", probabilidade=prob_modelo[lado])
-    return sugestao, prob_modelo[lado] - prob_modelo[segundo]
+    return sugestao, abs(prob_modelo[lado] - prob_liga[lado])
 
 
-def _candidato_over_under(limiar: float, prob_over: float) -> tuple:
-    if prob_over >= 0.5:
-        rotulo, prob = f"Mais de {limiar} golos", prob_over
+def _candidato_over_under(limiar: float, prob_blend: float, desvio: float) -> tuple:
+    if prob_blend >= 0.5:
+        rotulo, prob = f"Mais de {limiar} golos", prob_blend
     else:
-        rotulo, prob = f"Menos de {limiar} golos", 1 - prob_over
+        rotulo, prob = f"Menos de {limiar} golos", 1 - prob_blend
     sugestao = Sugestao(
         tipo="golos", texto=f"{rotulo} — só se a odd for ≥ {_odd_minima(prob):.2f}",
         confianca="", probabilidade=prob, odd_minima=_odd_minima(prob),
     )
-    return sugestao, abs(2 * prob_over - 1)
+    return sugestao, desvio
 
 
-def _candidato_btts(prob_golos: dict) -> tuple:
-    if prob_golos["btts_sim"] >= prob_golos["btts_nao"]:
-        rotulo, prob = "Ambas marcam — Sim", prob_golos["btts_sim"]
+def _candidato_btts(prob_blend_sim: float, desvio: float) -> tuple:
+    if prob_blend_sim >= 0.5:
+        rotulo, prob = "Ambas marcam — Sim", prob_blend_sim
     else:
-        rotulo, prob = "Ambas marcam — Não", prob_golos["btts_nao"]
+        rotulo, prob = "Ambas marcam — Não", 1 - prob_blend_sim
     sugestao = Sugestao(
         tipo="golos", texto=f"{rotulo} — só se a odd for ≥ {_odd_minima(prob):.2f}",
         confianca="", probabilidade=prob, odd_minima=_odd_minima(prob),
     )
-    return sugestao, abs(prob_golos["btts_sim"] - prob_golos["btts_nao"])
+    return sugestao, desvio
 
 
 def _com_confianca(sugestao: Sugestao, confianca_base: str) -> Sugestao:
@@ -129,11 +134,11 @@ def _com_confianca(sugestao: Sugestao, confianca_base: str) -> Sugestao:
 
 def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | None:
     """Analisa um jogo em vários mercados (1X2, golos a várias linhas,
-    ambas marcam) e escolhe como opinião principal aquele em que o modelo
-    está mais decisivo — não é sempre o mesmo tipo de mercado. Mostra como
-    alternativas os outros mercados em que a opinião também é clara.
-    Devolve None se alguma das equipas não existir nas estatísticas da
-    competição."""
+    ambas marcam) e escolhe como opinião principal aquele em que este
+    jogo mais se desvia do normal para a liga — não é sempre o mesmo tipo
+    de mercado. Mostra como alternativas os outros mercados em que o
+    desvio também é claro. Devolve None se alguma das equipas não existir
+    nas estatísticas da competição."""
     casa, fora = evento["equipas"]
     equipas_modelo = forcas.get("equipas", {})
     casa_eq = encontrar_nome_equivalente(casa, equipas_modelo)
@@ -153,27 +158,29 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
 
     prob_golos = {"btts_sim": wg * prob_modelo["btts_sim"] + (1 - wg) * prob_liga["btts_sim"]}
     prob_golos["btts_nao"] = 1 - prob_golos["btts_sim"]
+    desvio_over = {}
     for limiar in LIMIARES_GOLOS:
         p_modelo_over = probabilidade_over(lambda_casa, lambda_fora, limiar)
         p_liga_over = probabilidade_over(media_casa, media_fora, limiar)
         prob_golos[f"over_{limiar}"] = wg * p_modelo_over + (1 - wg) * p_liga_over
+        desvio_over[limiar] = abs(p_modelo_over - p_liga_over)
 
     if confianca_base == "baixa":
         avisos.append(
             f"Poucos jogos na amostra ({jogos_min}) para pelo menos uma das equipas — o modelo é pouco fiável aqui."
         )
 
-    candidatos = [_candidato_1x2(casa, fora, prob_modelo)]
+    candidatos = [_candidato_1x2(casa, fora, prob_modelo, prob_liga)]
     for limiar in LIMIARES_GOLOS:
-        candidatos.append(_candidato_over_under(limiar, prob_golos[f"over_{limiar}"]))
-    candidatos.append(_candidato_btts(prob_golos))
+        candidatos.append(_candidato_over_under(limiar, prob_golos[f"over_{limiar}"], desvio_over[limiar]))
+    candidatos.append(_candidato_btts(prob_golos["btts_sim"], abs(prob_modelo["btts_sim"] - prob_liga["btts_sim"])))
     candidatos.sort(key=lambda c: c[1], reverse=True)
 
     principal = _com_confianca(candidatos[0][0], confianca_base)
     alternativas = [
         _com_confianca(sugestao, confianca_base)
-        for sugestao, margem in candidatos[1:]
-        if margem >= config.APOSTAS_MARGEM_EXTRA
+        for sugestao, desvio in candidatos[1:]
+        if desvio >= config.APOSTAS_DESVIO_EXTRA
     ]
 
     return AnaliseJogo(
