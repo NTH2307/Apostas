@@ -153,7 +153,12 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
         f"<li><span class='meta'>{escape(_data_extenso(a.inicio.date()) if a.inicio else '')} · "
         f"{a.inicio.strftime('%H:%M') if a.inicio else ''} · {escape(a.competicao)}</span><br>"
         f"<strong>{escape(a.casa)} vs {escape(a.fora)}</strong> → {escape(a.sugestao.texto)}"
-        f"<span class='badge'>confiança {escape(a.sugestao.confianca)}</span></li>"
+        f"<span class='badge'>confiança {escape(a.sugestao.confianca)}</span>"
+        + "".join(
+            f"<div class='alt'>⚽ {escape(alt.texto)} <span class='badge'>confiança {escape(alt.confianca)}</span></div>"
+            for alt in a.alternativas
+        )
+        + "</li>"
         for a in melhores[:top]
     ) or "<li>Nenhum jogo analisado neste período.</li>"
 

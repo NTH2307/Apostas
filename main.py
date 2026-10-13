@@ -249,8 +249,11 @@ def _intervalo_datas(args) -> tuple[date, date]:
 def _linha_sugestao(analise) -> str:
     s = analise.sugestao
     quando = analise.inicio.strftime("%d/%m %H:%M") if analise.inicio else "—"
-    return (f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n"
-            f"   🎯 {s.texto} · confiança {s.confianca}")
+    linha = (f"📅 {quando} · {analise.competicao} · {analise.casa} vs {analise.fora}\n"
+             f"   🎯 {s.texto} · confiança {s.confianca}")
+    for alt in analise.alternativas:
+        linha += f"\n   ⚽ {alt.texto} · confiança {alt.confianca}"
+    return linha
 
 
 def cmd_apostas(args):
