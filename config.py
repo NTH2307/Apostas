@@ -75,12 +75,16 @@ RELATORIO_PATH = os.getenv("RELATORIO_PATH", os.path.join(os.path.dirname(__file
 # basquetebol; competições de seleções como a Liga das Nações não estão
 # disponíveis no free tier — usa `python main.py competicoes` para
 # confirmares o que o teu plano cobre). Edita à vontade; separa por vírgula.
+# A Liga dos Campeões (CL) fica de fora por omissão: no início da época
+# tem muito poucos jogos terminados por equipa, o que dá palpites quase
+# só pela vantagem de jogar em casa — podes voltar a pôr (CL:soccer_uefa_champs_league)
+# quando a fase de liga já tiver mais jornadas jogadas.
 COMPETICOES_MODELO = [
     tuple(par.split(":")) for par in os.getenv(
         "COMPETICOES_MODELO",
         "PL:soccer_epl,PD:soccer_spain_la_liga,SA:soccer_italy_serie_a,"
         "BL1:soccer_germany_bundesliga,FL1:soccer_france_ligue_one,"
-        "PPL:soccer_portugal_primeira_liga,CL:soccer_uefa_champs_league,"
+        "PPL:soccer_portugal_primeira_liga,"
         "ELC:soccer_efl_champ,DED:soccer_netherlands_eredivisie,"
         "BSA:soccer_brazil_campeonato,CLI:soccer_conmebol_copa_libertadores",
     ).split(",") if par.strip()
