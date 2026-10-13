@@ -1,4 +1,4 @@
-from app.poisson import _poisson, golos_esperados, probabilidades
+from app.poisson import _poisson, golos_esperados, probabilidade_over, probabilidades
 
 
 def test_poisson_soma_um_sobre_o_suporte():
@@ -20,6 +20,15 @@ def test_probabilidades_1x2_somam_um():
 def test_probabilidades_over_under_somam_um():
     probs = probabilidades(1.8, 1.1)
     assert abs(probs["over_2.5"] + probs["under_2.5"] - 1.0) < 1e-9
+
+
+def test_probabilidade_over_e_consistente_com_probabilidades_na_linha_2_5():
+    assert abs(probabilidade_over(1.8, 1.1, 2.5) - probabilidades(1.8, 1.1)["over_2.5"]) < 1e-9
+
+
+def test_probabilidade_over_desce_quando_a_linha_sobe():
+    p = probabilidade_over(1.8, 1.1, 1.5)
+    assert p > probabilidade_over(1.8, 1.1, 2.5) > probabilidade_over(1.8, 1.1, 3.5)
 
 
 def test_probabilidades_btts_somam_um():

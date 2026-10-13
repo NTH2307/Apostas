@@ -28,32 +28,31 @@ def test_confianca_por_amostra():
     assert confianca_por_amostra(2) == "baixa"
 
 
-def test_palpite_1x2_e_sempre_o_favorito_do_modelo():
+def test_opiniao_principal_e_o_mercado_mais_decisivo_nao_so_1x2():
+    # casa muito mais forte: o 1X2 é o mercado mais decisivo (maior margem)
+    decisivo = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=12), "Liga Teste")
+    assert decisivo.sugestao.tipo == "1x2"
+    assert "Casa" in decisivo.sugestao.texto
+
+    # equipas equivalentes: o 1X2 fica equilibrado, mas golos continua decisivo —
+    # a opinião principal passa a ser sobre golos, não sobre o resultado
+    equilibrado = analisar_jogo(_evento(), _forcas(casa_forte=False, jogos=12), "Liga Teste")
+    assert equilibrado.sugestao.tipo == "golos"
+
+
+def test_mostra_mais_do_que_uma_opiniao_quando_mais_de_um_mercado_e_decisivo():
     analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    s = analise.sugestao
-    assert s.tipo == "1x2"
-    assert "Casa" in s.texto
-    assert s.confianca == "alta"
-    assert s.probabilidade == analise.prob_modelo["casa"]
+    assert len(analise.alternativas) >= 1
+    for alt in analise.alternativas:
+        assert alt.tipo == "golos"
+        assert alt.confianca == "média"  # sem odds reais de golos, nunca passa de média
+        assert alt.odd_minima > 1 / alt.probabilidade
 
 
-def test_poucos_jogos_continua_a_dar_palpite_mas_avisa_confianca_baixa():
+def test_poucos_jogos_continua_a_dar_opiniao_mas_avisa_confianca_baixa():
     analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=2), "Liga Teste")
-    assert analise.sugestao.tipo == "1x2"
     assert analise.sugestao.confianca == "baixa"
     assert any("Poucos jogos" in aviso for aviso in analise.avisos)
-
-
-def test_mostra_sempre_as_duas_opinioes_de_golos_over_under_e_btts():
-    analise = analisar_jogo(_evento(), _forcas(casa_forte=True, jogos=12), "Liga Teste")
-    assert len(analise.alternativas) == 2
-    textos = [a.texto for a in analise.alternativas]
-    assert any("golos" in t.lower() for t in textos)
-    assert any("ambas marcam" in t.lower() for t in textos)
-    for golos in analise.alternativas:
-        assert golos.tipo == "golos"
-        assert golos.odd_minima > 1 / golos.probabilidade
-        assert golos.confianca == "média"  # sem odds reais de golos, nunca passa de média
 
 
 def test_equipa_desconhecida_devolve_none():

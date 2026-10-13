@@ -1,8 +1,9 @@
 """Modelo de Poisson para golos: a partir dos golos esperados de cada
 equipa (ver `golos_esperados`, que usa as forças calculadas em
-app/stats.py), estima probabilidades de 1X2, over/under 2.5 golos, e
-ambas marcam (BTTS). É um modelo simples e conhecido publicamente — não é
-segredo nem garantia de acerto, só estatística sobre resultados passados.
+app/stats.py), estima probabilidades de 1X2, over/under golos (a
+qualquer linha, não só 2.5), e ambas marcam (BTTS). É um modelo simples e
+conhecido publicamente — não é segredo nem garantia de acerto, só
+estatística sobre resultados passados.
 """
 import math
 
@@ -29,13 +30,28 @@ def golos_esperados(forcas: dict, equipa_casa: str, equipa_fora: str):
     return lambda_casa, lambda_fora
 
 
-def probabilidades(lambda_casa: float, lambda_fora: float) -> dict:
-    """Probabilidades de mercado a partir dos golos esperados de cada
-    equipa: 1X2, over/under 2.5 golos, ambas marcam (BTTS)."""
-    matriz = [
+def _matriz_golos(lambda_casa: float, lambda_fora: float) -> list:
+    return [
         [_poisson(gc, lambda_casa) * _poisson(gf, lambda_fora) for gf in range(MAX_GOLOS + 1)]
         for gc in range(MAX_GOLOS + 1)
     ]
+
+
+def probabilidade_over(lambda_casa: float, lambda_fora: float, linha: float) -> float:
+    """Probabilidade de o total de golos do jogo ser maior do que `linha`
+    (ex: 1.5, 2.5, 3.5) — qualquer linha, não só 2.5."""
+    matriz = _matriz_golos(lambda_casa, lambda_fora)
+    return sum(
+        matriz[gc][gf]
+        for gc in range(MAX_GOLOS + 1) for gf in range(MAX_GOLOS + 1)
+        if gc + gf > linha
+    )
+
+
+def probabilidades(lambda_casa: float, lambda_fora: float) -> dict:
+    """Probabilidades de mercado a partir dos golos esperados de cada
+    equipa: 1X2, over/under 2.5 golos, ambas marcam (BTTS)."""
+    matriz = _matriz_golos(lambda_casa, lambda_fora)
 
     p_casa = sum(matriz[gc][gf] for gc in range(MAX_GOLOS + 1) for gf in range(MAX_GOLOS + 1) if gc > gf)
     p_empate = sum(matriz[gc][gf] for gc in range(MAX_GOLOS + 1) for gf in range(MAX_GOLOS + 1) if gc == gf)

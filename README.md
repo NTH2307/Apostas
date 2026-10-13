@@ -92,15 +92,23 @@ a odds nem a casas de apostas:
      jogo de há 60 dias pesa metade de um de hoje). Uma equipa em má fase
      atual não fica escondida atrás de bons resultados de há meses (nem
      o inverso).
-2. O palpite de resultado (1X2) é sempre o lado (casa/empate/fora) com
-   maior probabilidade segundo este modelo — **é só a opinião do modelo**,
-   sem comparação nenhuma com odds ou mercado.
-3. Mostra sempre, também, a opinião em dois mercados de golos — nunca só
-   um, e nunca escondidos: **mais ou menos de 2.5 golos**, e **ambas
-   marcam, sim ou não** (o lado mais provável de cada um). Sem odds reais
-   desses mercados para comparar, vêm com uma **odd mínima** só
-   informativa: se quiseres confirmar na tua casa se compensa, essa é a
-   referência — não faz parte do palpite em si.
+2. Olha a **vários mercados possíveis** para o mesmo jogo: resultado
+   (1X2), mais/menos de 1.5/2.5/3.5 golos, e ambas marcam — em cada um,
+   o lado mais provável segundo o modelo.
+3. Mostra como **opinião principal** o mercado em que o modelo está mais
+   decisivo (maior margem entre o lado escolhido e a alternativa) — **não
+   é sempre o resultado**, pode ser qualquer um destes mercados,
+   dependendo do jogo. Quando mais do que um mercado é claramente
+   decisivo para o mesmo jogo, mostra mais do que uma opinião
+   (`APOSTAS_MARGEM_EXTRA`) — nunca um número fixo, é o que o modelo
+   achar que vale a pena para aquele jogo em concreto.
+
+Sem odds reais dos mercados de golos para comparar, vêm com uma **odd
+mínima** só informativa: se quiseres confirmar na tua casa se compensa,
+essa é a referência — não faz parte do palpite em si. **Cantos, cartões e
+marcador individual não entram** — não há dados fiáveis e gratuitos para
+os calcular; dava para adicionar no futuro, mas precisaria de outra fonte
+de dados (provavelmente paga).
 
 A **confiança** depende só de quantos jogos há na amostra da equipa com
 menos dados (10+: alta, 5-9: média, <5: baixa) — não do tamanho do valor

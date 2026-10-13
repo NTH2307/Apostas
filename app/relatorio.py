@@ -115,8 +115,10 @@ def _card(analise: AnaliseJogo) -> str:
     linhas_golos = "".join(
         f"<tr><td>{escape(rotulo)}</td><td>{_pct(analise.prob_golos[chave])}</td>"
         f"<td>{1 / analise.prob_golos[chave]:.2f}</td></tr>"
-        for chave, rotulo in (("over_2.5", "Mais de 2.5 golos"), ("under_2.5", "Menos de 2.5 golos"),
-                              ("btts_sim", "Ambas marcam — Sim"), ("btts_nao", "Ambas marcam — Não"))
+        for chave, rotulo in (
+            ("over_1.5", "Mais de 1.5 golos"), ("over_2.5", "Mais de 2.5 golos"), ("over_3.5", "Mais de 3.5 golos"),
+            ("btts_sim", "Ambas marcam — Sim"), ("btts_nao", "Ambas marcam — Não"),
+        )
         if analise.prob_golos[chave] > 0
     )
 

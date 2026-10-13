@@ -1,13 +1,14 @@
-"""Transforma a análise de um jogo num conjunto de opiniões concretas, para
-todos os jogos — sem olhar a odds nem a casas de apostas, é só a opinião
-do modelo, em vários mercados (como numa casa de apostas, mas sem copiar
-nenhuma):
+"""Transforma a análise de um jogo numa opinião concreta — sem olhar a
+odds nem a casas de apostas, é só a opinião do modelo.
 
-1. **Resultado (1X2)**: o lado (casa/empate/fora) com maior probabilidade
-   segundo o modelo de golos próprio — é sempre dinâmico, pode ser
-   qualquer um dos três, não só a casa.
-2. **Mais/menos de 2.5 golos**: o lado mais provável dos dois.
-3. **Ambas marcam**: sim ou não, o mais provável dos dois.
+Para cada jogo, o modelo olha para **vários mercados possíveis**
+(resultado 1X2, mais/menos de 1.5/2.5/3.5 golos, ambas marcam) e escolhe
+o lado mais provável em cada um. Depois mostra como opinião principal
+aquele em que está **mais decisivo** (maior margem entre o lado escolhido
+e a alternativa) — não é sempre o resultado, pode ser qualquer um destes
+mercados, dependendo do jogo. Quando mais do que um mercado é claramente
+decisivo para o mesmo jogo, mostra os dois (ou mais) como opiniões — nunca
+um número fixo, é o que o modelo achar que vale a pena para aquele jogo.
 
 Para os mercados de golos não temos odds reais para comparar, por isso
 vêm com uma **odd mínima** só informativa — confirmas tu na tua casa, se
@@ -16,8 +17,8 @@ quiseres.
 ⚠️ Isto não é uma previsão garantida — é a opinião do modelo. Mesmo
 palpites de confiança "alta" perdem muitas vezes; as casas de apostas têm
 normalmente mais informação do que este modelo (lesões, onzes, motivação).
-Cantos, cartões e outros mercados não entram aqui — não há dados fiáveis
-e gratuitos para os calcular.
+Cantos, cartões e marcador individual não entram aqui — não há dados
+fiáveis e gratuitos para os calcular (ver README).
 """
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,18 +27,16 @@ from urllib.parse import quote
 import config
 from app.model import encontrar_nome_equivalente
 from app.odds import hora_local
-from app.poisson import golos_esperados, probabilidades
+from app.poisson import golos_esperados, probabilidade_over, probabilidades
 
 LADOS_1X2 = ("casa", "empate", "fora")
-MERCADO_OVER_UNDER = (("over_2.5", "Mais de 2.5 golos"), ("under_2.5", "Menos de 2.5 golos"))
-MERCADO_BTTS = (("btts_sim", "Ambas marcam — Sim"), ("btts_nao", "Ambas marcam — Não"))
-MERCADOS_GOLOS = MERCADO_OVER_UNDER + MERCADO_BTTS
+LIMIARES_GOLOS = (1.5, 2.5, 3.5)
 ORDEM_CONFIANCA = {"alta": 2, "média": 1, "baixa": 0}
 
 
 @dataclass
 class Sugestao:
-    tipo: str  # "1x2" (sempre, é o palpite principal) ou "golos" (só como alternativa)
+    tipo: str  # "1x2" ou "golos" — qualquer um pode ser o palpite principal
     texto: str
     confianca: str  # "alta", "média" ou "baixa"
     probabilidade: float | None = None
@@ -81,48 +80,60 @@ def confianca_por_amostra(jogos_min: int) -> str:
     return "baixa"
 
 
-def _sugestao_1x2(casa: str, fora: str, prob_modelo: dict, confianca_base: str) -> Sugestao:
-    """Palpite do modelo: o lado (casa/empate/fora) com maior probabilidade
-    segundo o modelo de golos — opinião do modelo, sem olhar a odds."""
-    rotulos = {"casa": f"Vitória do {casa}", "empate": "Empate", "fora": f"Vitória do {fora}"}
-    lado = max(LADOS_1X2, key=lambda l: prob_modelo[l])
-    return Sugestao(
-        tipo="1x2",
-        texto=rotulos[lado],
-        confianca=confianca_base,
-        probabilidade=prob_modelo[lado],
-    )
-
-
-def _sugestao_mercado_golos(prob_golos: dict, grupo: tuple, confianca_base: str) -> Sugestao:
-    """Opinião do modelo num mercado de golos de duas vias (over/under,
-    ou ambas marcam): o lado mais provável dos dois, sempre."""
-    chave, rotulo = max(grupo, key=lambda m: prob_golos[m[0]])
-    prob = prob_golos[chave]
+def _odd_minima(prob: float) -> float:
     # exige 5% acima da odd justa, para compensar a margem de erro do modelo
-    odd_minima = round(1 / prob * 1.05, 2)
-    return Sugestao(
-        tipo="golos",
-        texto=f"{rotulo} — só se a odd for ≥ {odd_minima:.2f}",
-        # sem odds reais para comparar, nunca passa de "média"
-        confianca="média" if confianca_base == "alta" else confianca_base,
-        probabilidade=prob,
-        odd_minima=odd_minima,
+    return round(1 / prob * 1.05, 2)
+
+
+def _candidato_1x2(casa: str, fora: str, prob_modelo: dict) -> tuple:
+    """(Sugestao, margem) — margem = diferença entre o lado escolhido e o
+    segundo mais provável, usada para comparar com outros mercados."""
+    rotulos = {"casa": f"Vitória do {casa}", "empate": "Empate", "fora": f"Vitória do {fora}"}
+    ordenado = sorted(LADOS_1X2, key=lambda l: prob_modelo[l], reverse=True)
+    lado, segundo = ordenado[0], ordenado[1]
+    sugestao = Sugestao(tipo="1x2", texto=rotulos[lado], confianca="", probabilidade=prob_modelo[lado])
+    return sugestao, prob_modelo[lado] - prob_modelo[segundo]
+
+
+def _candidato_over_under(limiar: float, prob_over: float) -> tuple:
+    if prob_over >= 0.5:
+        rotulo, prob = f"Mais de {limiar} golos", prob_over
+    else:
+        rotulo, prob = f"Menos de {limiar} golos", 1 - prob_over
+    sugestao = Sugestao(
+        tipo="golos", texto=f"{rotulo} — só se a odd for ≥ {_odd_minima(prob):.2f}",
+        confianca="", probabilidade=prob, odd_minima=_odd_minima(prob),
     )
+    return sugestao, abs(2 * prob_over - 1)
 
 
-def _sugestoes_golos(prob_golos: dict, confianca_base: str) -> list:
-    """Opinião do modelo sobre mais/menos de 2.5 golos E sobre ambas
-    marcam — dois mercados independentes, sempre os dois, nunca só um."""
-    return [
-        _sugestao_mercado_golos(prob_golos, MERCADO_OVER_UNDER, confianca_base),
-        _sugestao_mercado_golos(prob_golos, MERCADO_BTTS, confianca_base),
-    ]
+def _candidato_btts(prob_golos: dict) -> tuple:
+    if prob_golos["btts_sim"] >= prob_golos["btts_nao"]:
+        rotulo, prob = "Ambas marcam — Sim", prob_golos["btts_sim"]
+    else:
+        rotulo, prob = "Ambas marcam — Não", prob_golos["btts_nao"]
+    sugestao = Sugestao(
+        tipo="golos", texto=f"{rotulo} — só se a odd for ≥ {_odd_minima(prob):.2f}",
+        confianca="", probabilidade=prob, odd_minima=_odd_minima(prob),
+    )
+    return sugestao, abs(prob_golos["btts_sim"] - prob_golos["btts_nao"])
+
+
+def _com_confianca(sugestao: Sugestao, confianca_base: str) -> Sugestao:
+    # mercados de golos: sem odds reais para comparar, nunca passam de "média"
+    sugestao.confianca = confianca_base if sugestao.tipo == "1x2" else (
+        "média" if confianca_base == "alta" else confianca_base
+    )
+    return sugestao
 
 
 def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | None:
-    """Analisa um jogo e escolhe a sugestão principal. Devolve None se
-    alguma das equipas não existir nas estatísticas da competição."""
+    """Analisa um jogo em vários mercados (1X2, golos a várias linhas,
+    ambas marcam) e escolhe como opinião principal aquele em que o modelo
+    está mais decisivo — não é sempre o mesmo tipo de mercado. Mostra como
+    alternativas os outros mercados em que a opinião também é clara.
+    Devolve None se alguma das equipas não existir nas estatísticas da
+    competição."""
     casa, fora = evento["equipas"]
     equipas_modelo = forcas.get("equipas", {})
     casa_eq = encontrar_nome_equivalente(casa, equipas_modelo)
@@ -136,17 +147,34 @@ def analisar_jogo(evento: dict, forcas: dict, competicao: str) -> AnaliseJogo | 
     confianca_base = confianca_por_amostra(jogos_min)
     avisos = []
 
-    prob_liga = probabilidades(forcas["media_golos_casa"], forcas["media_golos_fora"])
+    media_casa, media_fora = forcas["media_golos_casa"], forcas["media_golos_fora"]
+    prob_liga = probabilidades(media_casa, media_fora)
     wg = config.APOSTAS_PESO_MODELO_GOLOS
-    prob_golos = {chave: wg * prob_modelo[chave] + (1 - wg) * prob_liga[chave] for chave, _ in MERCADOS_GOLOS}
+
+    prob_golos = {"btts_sim": wg * prob_modelo["btts_sim"] + (1 - wg) * prob_liga["btts_sim"]}
+    prob_golos["btts_nao"] = 1 - prob_golos["btts_sim"]
+    for limiar in LIMIARES_GOLOS:
+        p_modelo_over = probabilidade_over(lambda_casa, lambda_fora, limiar)
+        p_liga_over = probabilidade_over(media_casa, media_fora, limiar)
+        prob_golos[f"over_{limiar}"] = wg * p_modelo_over + (1 - wg) * p_liga_over
 
     if confianca_base == "baixa":
         avisos.append(
             f"Poucos jogos na amostra ({jogos_min}) para pelo menos uma das equipas — o modelo é pouco fiável aqui."
         )
 
-    principal = _sugestao_1x2(casa, fora, prob_modelo, confianca_base)
-    alternativas = _sugestoes_golos(prob_golos, confianca_base)
+    candidatos = [_candidato_1x2(casa, fora, prob_modelo)]
+    for limiar in LIMIARES_GOLOS:
+        candidatos.append(_candidato_over_under(limiar, prob_golos[f"over_{limiar}"]))
+    candidatos.append(_candidato_btts(prob_golos))
+    candidatos.sort(key=lambda c: c[1], reverse=True)
+
+    principal = _com_confianca(candidatos[0][0], confianca_base)
+    alternativas = [
+        _com_confianca(sugestao, confianca_base)
+        for sugestao, margem in candidatos[1:]
+        if margem >= config.APOSTAS_MARGEM_EXTRA
+    ]
 
     return AnaliseJogo(
         competicao=competicao,
