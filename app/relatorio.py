@@ -75,7 +75,9 @@ def _pct(p) -> str:
 def _texto_sugestao(analise: AnaliseJogo) -> str:
     s = analise.sugestao
     if s.tipo == "1x2":
-        return f"Opinião do modelo · probabilidade estimada {_pct(s.probabilidade)}"
+        pm = analise.prob_modelo
+        return (f"Opinião do modelo: {analise.casa} {_pct(pm['casa'])} · empate {_pct(pm['empate'])} · "
+                f"{analise.fora} {_pct(pm['fora'])}")
     if s.tipo == "golos":
         return (f"Probabilidade estimada {_pct(s.probabilidade)} — compara com a odd na tua casa; "
                 f"abaixo de {s.odd_minima:.2f} não compensa")
@@ -154,6 +156,7 @@ def gerar_html(resultados: list, inicio, fim, top: int = 10, gerado_em: datetime
         f"{a.inicio.strftime('%H:%M') if a.inicio else ''} · {escape(a.competicao)}</span><br>"
         f"<strong>{escape(a.casa)} vs {escape(a.fora)}</strong> → {escape(a.sugestao.texto)}"
         f"<span class='badge'>confiança {escape(a.sugestao.confianca)}</span>"
+        f"<div class='meta'>{escape(_texto_sugestao(a))}</div>"
         + "".join(
             f"<div class='alt'>⚽ {escape(alt.texto)} <span class='badge'>confiança {escape(alt.confianca)}</span></div>"
             for alt in a.alternativas
